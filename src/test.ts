@@ -13,7 +13,8 @@ function printVisit(d: PositionedElement, indent = '') {
   if (d.is(Scope)) {
     d.declarations.forEach(mp)
   } else if (d.is(VariableDeclaration)) {
-    p(c.gray.bold(d.varconst) + ' ' + d.name)
+    if (d.is_public)
+      p(c.gray.bold(d.varconst) + ' ' + d.name)
   } else if (d.is(FunctionDeclaration)) {
     p(c.green.bold('fn') + ' ' + d.name)
     d.declarations.forEach(mp)
