@@ -1,6 +1,10 @@
 import { Lexeme } from "./libparse"
 
 export class PropertyChainer {
+  is<T extends {new (...a: any[]): any}>(kls: T): this is InstanceType<T> {
+    return this.constructor === kls
+  }
+
   set<K extends keyof this>(k: K, value: this[K]) {
     this[k] = value
     return this
@@ -19,11 +23,6 @@ export class Position {
      * The last lexeme position of this element
      */
     public lex_end: number,
-
-    /**
-     * The file tied to this position
-     */
-    public path: string
   ) { }
 }
 
@@ -38,6 +37,7 @@ export class PositionedElement extends PropertyChainer {
  * It is always tied to a scope.
  */
 export class Declaration extends PositionedElement {
+  is_public: boolean = false
   name: string = ''
 }
 
@@ -50,6 +50,7 @@ export class UnprocessedType {
 
 
 export class VariableDeclaration extends Declaration {
+  varconst = 'const'
   type!: UnprocessedType | ContainerDeclaration // explicit type declaration.
 }
 
@@ -57,14 +58,12 @@ export class VariableDeclaration extends Declaration {
 /**
  * A scope contains declarations. That's about it.
  */
-export class Scope extends PositionedElement {
+export class Scope extends Declaration {
   // A scope can exist inside another scope.
   parent: Scope | null = null
   declarations: Declaration[] = []
 
-  handleDeclaration(decl: Declaration) {
-
-  }
+  handleDeclaration(decl: Declaration) { }
 
   appendDeclarations(decl: Declaration[]) {
     for (var d of decl) this.handleDeclaration(d)
@@ -115,6 +114,10 @@ export class FunctionDeclaration extends Scope {
   return_type: string = ''
 }
 
+
+export class MemberField extends VariableDeclaration {
+
+}
 
 export class MemberedContainer extends ContainerDeclaration {
   // members:

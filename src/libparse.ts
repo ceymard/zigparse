@@ -44,7 +44,7 @@ export class Lexer {
     var pos!: number
 
     if (position > this.lexed[end].end)
-      return end
+      return this.lexed[end]
 
     while (end - start > 1) {
       pos = Math.round((start + end) / 2)
@@ -56,7 +56,7 @@ export class Lexer {
       } else {
         // found you !
         // console.log(this.lexed[pos])
-        return pos
+        return this.lexed[pos]
       }
     }
     return null

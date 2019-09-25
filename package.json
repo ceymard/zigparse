@@ -6,6 +6,7 @@
   "author": "Christophe Eymard <christophe.eymard@gmail.com>",
   "license": "MIT",
   "devDependencies": {
-    "@types/node": "^12.7.7"
+    "@types/node": "^12.7.7",
+    "chalk": "^2.4.2"
   }
 }

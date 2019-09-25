@@ -1,5 +1,6 @@
 import { RawRule, Either, Seq, Rule, Z, ZF, Lexer, Lexeme, Opt, Token, any, balanced_expr, first, separated_by, S } from './libparse'
-import { Variable, Declaration, Enum, Union, ContainerField, Scope, FunctionDecl, Struct } from './pseudo-ast'
+// import { Variable, Declaration, Enum, Union, ContainerField, Scope, FunctionDecl, Struct } from './pseudo-ast'
+import { Declaration, Scope, PositionedElement, VariableDeclaration, FunctionDeclaration, StructDeclaration, EnumDeclaration, UnionDeclaration, Position, MemberField } from './ast'
 
 export const T = {
   BLOCK_COMMENT: /([ \t]*\/\/\/[^\n]*\n)+/m,
@@ -35,15 +36,15 @@ const comptime = Opt('comptime')
 const qualifiers = Either('var', 'const')
 const struct_qualifiers = Z(Either('packed', 'aligned')).map(mkset)
 const func_qualifiers = Z(Either(
-  Seq('extern', Opt(T.STR)),
+  S`extern ${Opt(T.STR)}`,
   'inline',
   'export'
 ))
 
 const ident = Token(T.IDENT).map(i => i.str.replace(/@"/, '').replace(/"$/, ''))
 
-function set_position<T extends Declaration>(decl: T, start: number, end: number) {
-  decl.setPosition(start, end)
+function set_position<T extends PositionedElement>(decl: T, start: number, end: number) {
+  decl.set('position', new Position (start, end))
   return decl
 }
 
@@ -54,11 +55,11 @@ export const bare_decl_scope = (until: RawRule<any> | null) => () => ZF(
     container_decl,
     func_decl,
     var_decl,
-    container_field(ContainerField)
+    container_field(MemberField)
   ),
   until
 ).map((objs) => new Scope()
-  .addDeclarations(objs)
+  .appendDeclarations(objs)
 ).map(set_position)
 
 const decl_scope = Seq('{', bare_decl_scope('}'), '}').map(([_1, scope, _2]) => scope)
@@ -72,71 +73,56 @@ const scope = (): Rule<Scope> => Seq(
   ), '}'),
   '}'
 ).map(([_1, decls, _2]) => new Scope()
-    .addDeclarations(decls)
+    .appendDeclarations(decls)
 ).map(set_position)
 
 
-const container_field = (base_type: typeof Variable) => Seq(
+const container_field = (base_type: typeof VariableDeclaration) => Seq(
   ident,
   ':',
   ZF(any, Either('=', ')', '}', ',', ';')).map(t => t.map(t => t.str).join(' '))
   // ident
 ).map(([id, _, typ]) => new base_type()
-  .setName(id)
-  .setType(typ)
+  .set('name', id)
+  .set('type', typ)
 ).map(set_position)
 
 
 const func_decl = Seq(
-  pub, Opt(func_qualifiers), 'fn', ident, balanced_expr('(', container_field(Variable), ')'), // function arguments, they contain variable declarations.
+  pub, Opt(func_qualifiers), 'fn', ident, balanced_expr('(', container_field(VariableDeclaration), ')'), // function arguments, they contain variable declarations.
   ZF(any, Either(';', '{')).map(t => t.map(t => t.str).join(' ')), // return type, unparsed for now.
   Either(
     Token(';').map(() => null),
     scope
   )
-).map(([pub, qual, _1, id, args, retr, maybe_scope]) => new FunctionDecl()
-  .setPublic(pub)
-  .setName(id)
-  .addDeclarations(args)
-  .addDeclarations(maybe_scope ? maybe_scope.declarations : null)
-  .setReturnType(retr)
+).map(([pub, qual, _1, id, args, retr, maybe_scope]) => new FunctionDeclaration()
+  .set('is_public', !!pub)
+  .set('name', id)
+  .set('args', args)
+  .set('return_type', retr)
+  .appendDeclarations(args) // args are in scope !
+  .appendDeclarations(maybe_scope ? maybe_scope.declarations : [])
 ).map(set_position)
 
 
-// const error_decl: Rule<Variable> = Seq(
-//   pub,
-//   'const',
-//   ident,
-//   '=',
-//   'error',
-//   '{',
-//   separated_by(',', ident),
-//   '}'
-// ).map(([pub, _1, id, _2, _3, _4, idents]) => new Variable()
-//   .setPublic(pub)
-//   .setName(id)
-//   .setType('error')
-
-// )
-
-
-const var_decl: Rule<Variable> = Seq(
+const var_decl: Rule<VariableDeclaration> = Seq(
   pub,
   qualifiers,
   ident,
   Opt(Seq(':', ZF(any, Either('=', '}', ',', ';'))).map(([_, t]) => t.map(t => t.str).join(' '))),
   '=',
   ZF(any, ';')
-).map(([pub, qual, ident, typ]) => new Variable()
-  .setPublic(pub)
-  .setName(ident)
-  .setType(typ)
+).map(([pub, qual, ident, typ]) => new VariableDeclaration()
+  .set('is_public', !!pub)
+  .set('varconst', qual.str)
+  .set('name', ident)
+  .set('type', typ)
 ).map(set_position)
 
 
 // ContainerField <- IDENTIFIER (COLON TypeExpr)? (EQUAL Expr)?
 
-const container_decl: Rule<Struct | Enum | Union> = Seq(
+const container_decl: Rule<StructDeclaration | EnumDeclaration | UnionDeclaration> = Seq(
   pub,
   qualifiers,
   ident,
@@ -148,10 +134,10 @@ const container_decl: Rule<Struct | Enum | Union> = Seq(
     'union'
   ).map(a => a.str),
   decl_scope
-).map(([pub, qual, ident, _1, quals, kind, scope]) => (kind === 'struct' ? new Struct() : kind === 'union' ? new Union() : new Enum())
-  .setPublic(pub)
-  .setName(ident)
-  .addDeclarations(scope.declarations)
+).map(([pub, qual, ident, _1, quals, kind, scope]) => (kind === 'struct' ? new StructDeclaration() : kind === 'union' ? new UnionDeclaration() : new EnumDeclaration())
+  .set('is_public', !!pub)
+  .set('name', ident)
+  .appendDeclarations(scope.declarations)
 ).map(set_position)
 
 /**
@@ -177,56 +163,3 @@ export const resolvable_outer_expr = separated_by('.', potential_fncall).map((ls
     start, end
   }
 })
-
-
-export class ZigHost {
-
-  files: {[name: string]: {lexer: Lexer, scope: Scope}} = {}
-
-  constructor() {
-    // should call `zig builtin` to get this
-    // this is a special import done to resolve @symbols.
-    // this.addFile('--builtin--', '')
-  }
-
-  addFile(path: string, contents: string) {
-    // const cts = fs.readFileSync(name, 'utf-8')
-    const lexer = new Lexer(Object.values(T))
-    const input = lexer.feed(contents)
-    const scope = bare_decl_scope(null)().parse(input)!
-    this.files[path] = {scope, lexer}
-  }
-
-  /**
-   * Get a list of all interesting declarations.
-   * @param path
-   * @param pos the position of
-   */
-  getDeclarationsInScope(path: string, pos: number) {
-
-  }
-
-  /**
-   * Get a declaration by its name from a given scope.
-   * @param path The path of the file
-   * @param pos The position in the file
-   * @param name The name of the symbol to resolve
-   */
-  getDeclarationByName(path: string, pos: number, name: string) {
-
-  }
-
-  /**
-   *
-   * @param decl
-   * @param path
-   */
-  getMembersChain(decl: Declaration, path: string[]): Declaration[] | null {
-    return null
-  }
-
-  getMembers(decl: Declaration) {
-
-  }
-
-}
