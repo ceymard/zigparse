@@ -1,0 +1,11 @@
+{
+  "name": "zigparse",
+  "version": "0.0.1",
+  "description": "A javascript zig parser",
+  "main": "lib/index.js",
+  "author": "Christophe Eymard <christophe.eymard@gmail.com>",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^12.7.7"
+  }
+}
