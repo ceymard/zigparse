@@ -49,6 +49,10 @@ export function tree(paths: string[], opt = 'tree' as string) {
     const f = host.addFile(path, contents)
     console.info(` lex(${f.lex_hrtime[0] > 0 ? c.red.bold('%ds') : '%ds'} %dms) parse(${f.parse_hrtime[0] > 0 ? c.red.bold('%ds') : '%ds'} %dms)`, f.lex_hrtime[0], f.lex_hrtime[1] / 1000000, f.parse_hrtime[0], f.parse_hrtime[1] / 1000000)
     if (opt !== 'silent') {
+      // for (var l of f.lexer.lexed) {
+      //   process.stdout.write(`'${l.str}' `)
+      // }
+      // console.log()
       printVisit(f.scope, opt === 'pub')
     }
   }

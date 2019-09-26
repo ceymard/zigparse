@@ -70,6 +70,7 @@ export class Lexer {
     var line = 1
     var col = 0
     var regexps = this.regexps
+    var original_regexps = this.original_regexps
     var res: Lexeme[] = []
     var skip = this.skip
 
@@ -91,14 +92,13 @@ export class Lexer {
       if (idx > str.length) return null
 
       var match: RegExpMatchArray | null = null
-      for (var reg of regexps) {
+      var rl = regexps.length
+      for (var i = 0; i < rl; i++) {
+        var reg = regexps[i]
         reg.lastIndex = idx
         if ((match = reg.exec(str)) && match.index === idx) {
-          return {regexp: reg, match}
+          return {regexp: original_regexps[i], match}
         }
-        // } else {
-        //   console.log(idx, reg, match ? match.index: '' )
-        // }
       }
       return null
     }
