@@ -406,6 +406,42 @@ export function Balanced<T>(_start: RawRule<any>, _rule: RawRule<T>, _end: RawRu
 }
 
 
+export function Between<T>(_start: RawRule<any>, _rule: RawRule<T>, _end: RawRule<any>): Rule<T[]> {
+  const start = mkRule(_start)
+  const end = mkRule(_end)
+  const rule = mkRule(_rule)
+  return new Rule((pos, input, step) => {
+    var res = [] as T[]
+    const st = step === 1 ? start : end
+    const en = step === 1 ? end : start
+
+    var st_res = st.tryParse(pos, input, step)
+    if (!st_res) return null
+    pos = st_res[0]
+
+    var end_pos = step === 1 ? input.length : -1
+    while (pos !== end_pos) {
+      var en_res = en.tryParse(pos, input, step)
+      if (en_res) {
+        pos = en_res[0]
+        return [pos, res]
+      }
+
+      var rule_res = rule.tryParse(pos, input, step)
+      if (rule_res) {
+        pos = rule_res[0]
+        res.push(rule_res[1] as T)
+        continue
+      }
+
+      pos += step
+    }
+
+    return null
+  })
+}
+
+
 export function ZF<T>(_r: RawRule<T>, until?: RawRule<any> | null): Rule<T[]> {
   const rule = mkRule(_r)
   const _until = until ? mkRule(until) : null

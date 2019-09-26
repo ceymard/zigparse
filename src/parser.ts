@@ -156,7 +156,7 @@ const modified_ident: Rule<string> = Seq(
 
 const potential_fncall = Seq(
   modified_ident,
-  Opt(Balanced('(', any, ')')), // FIXME this is buggy !
+  Opt(Balanced('(', any, ')')),
 ).map(([i, c]) => i)
 
 export const resolvable_outer_expr = Seq(Opt('try'), Opt(Seq(any, '!')), separated_by('.', potential_fncall)).map(third).map((lst, start, end) => {
