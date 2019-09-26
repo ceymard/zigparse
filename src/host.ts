@@ -1,16 +1,29 @@
 import { Scope, Declaration } from "./ast"
 import { Lexer, Lexeme } from "./libparse"
-import { bare_decl_scope } from "./parser"
+import { bare_decl_scope, T } from "./parser"
 
+
+// go to definition
+// completion provider
+// documentSymbolProvider
+// signature help
+// handle refactoring, especially across files !
 
 
 export class File {
 
   constructor(
+    public host: ZigHost,
     public lexer: Lexer,
     public scope: Scope,
-    public contents: string
+    public contents: string,
+    public lex_hrtime: [number, number] = [0, 0],
+    public parse_hrtime: [number, number] = [0, 0]
   ) {
+
+  }
+
+  protected getDeclarationsInScope(scope: Scope) {
 
   }
 
@@ -18,12 +31,12 @@ export class File {
    *
    * @param pos position in the file
    */
-  getScopeFromPosition(pos: number) {
+  protected getScopeFromPosition(pos: number) {
     const lex = this.lexer.getLexemeAt(pos)
     return lex ? this.getScopeFromLexeme(this.scope, lex) : null
   }
 
-  getScopeFromLexeme(scope: Scope, lex: Lexeme): Scope {
+  protected getScopeFromLexeme(scope: Scope, lex: Lexeme): Scope {
     for (var d of scope.declarations) {
 
       if (!(d instanceof Scope))
@@ -36,6 +49,16 @@ export class File {
     }
     return scope
   }
+
+  /**
+   * Get declarations corresponding to what can complete at symbol.
+   *
+   * @param file_pos: The 0 based position in the file (not line or column)
+   */
+  public getCompletionsAt(file_pos: number) {
+
+  }
+
 }
 
 
@@ -56,10 +79,17 @@ export class ZigHost {
       return prev_file
 
     // const cts = fs.readFileSync(name, 'utf-8')
+
+    var start = process.hrtime()
     const lexer = new Lexer(Object.values(T))
     const input = lexer.feed(contents)
+    const lex_hrtime = process.hrtime(start)
+
+    start = process.hrtime()
     const scope = bare_decl_scope(null)().parse(input)!
-    const res = this.files[path] = new File(lexer, scope, contents)
+    const parse_hrtime = process.hrtime(start)
+
+    const res = this.files[path] = new File(this, lexer, scope, contents, lex_hrtime, parse_hrtime)
     return res
   }
 

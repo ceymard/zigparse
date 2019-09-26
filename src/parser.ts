@@ -4,6 +4,8 @@ import { Declaration, Scope, PositionedElement, VariableDeclaration, FunctionDec
 
 export const T = {
   BLOCK_COMMENT: /([ \t]*\/\/\/[^\n]*\n)+/m,
+  STR: /"(\\"|.)*"|\\\\[^\n]*\n(\s*\\\\[^\n]*\n)*/,
+  CHAR: /'(\\'|.)*'/,
   IDENT: /@?\w+|@"[^"]+"/,
   OP: new RegExp([
     /&=|&/,
@@ -25,8 +27,6 @@ export const T = {
   ].map(r => r.source).join('|')),
   // /&=?|\*[\*=%]?=?|==?=?|\./,
   CONTROL: /\(|\{|\[|\]|\}|\)|;|:|,/,
-  STR: /"([^"]|\\")*"/,
-  CHAR: /'([^']|\\')*'/
 }
 
 const mkset = (l: Lexeme[]) => new Set(l.map(l => l.str))

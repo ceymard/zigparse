@@ -30,9 +30,11 @@ export class Lexeme {
 export class Lexer {
 
   lexed: Lexeme[] = []
+  original_regexps: RegExp[] = []
 
   constructor(public regexps: RegExp[], public skip = /[\t \s\n]+|\/\/[^\/][^\n]*\n/m) {
-    this.regexps = [...regexps, skip]
+    this.original_regexps = [...regexps, skip]
+    this.regexps = this.original_regexps.map(r => new RegExp(r.source, r.flags + 'y'))
   }
 
   /**
@@ -90,12 +92,13 @@ export class Lexer {
 
       var match: RegExpMatchArray | null = null
       for (var reg of regexps) {
-        // reg.lastIndex = idx
-        if ((match = reg.exec(str.slice(idx))) && match.index === 0) {
+        reg.lastIndex = idx
+        if ((match = reg.exec(str)) && match.index === idx) {
           return {regexp: reg, match}
-        } else {
-          // console.log(idx, reg, str.slice(idx, idx + 15), match )
         }
+        // } else {
+        //   console.log(idx, reg, match ? match.index: '' )
+        // }
       }
       return null
     }
@@ -120,8 +123,10 @@ export class Lexer {
       col = lin[1]
     }
 
-    if (idx < str.length)
+    if (idx < str.length) {
+      console.error(res.slice(Math.max(res.length - 5, 0), res.length))
       throw new Error(`leftovers: ${str.slice(idx, idx + 64)}...`)
+    }
 
     this.lexed = res
 
@@ -267,11 +272,18 @@ export function S(tpl: TemplateStringsArray, ...rules: RawRule<any>[]): Rule<any
     var item = tpl[i].trim()
     if (item) mapped_rules.push(item)
     if (rules[i]) {
+      indexes.push(mapped_rules.length)
       mapped_rules.push(rules[i])
-      indexes.push(i)
     }
   }
-  return (Seq as any)(...mapped_rules).map((res: any) => len > 1 ? res : res[0])
+  return (Seq as any)(...mapped_rules).map((res: any) => {
+    const _res = new Array(len)
+    for (var i = 0; i < len; i++) {
+      _res[i] = res[indexes[i]]
+    }
+
+    return len > 1 ? _res : _res[0]
+  })
 }
 
 
