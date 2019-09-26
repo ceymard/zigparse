@@ -155,6 +155,7 @@ export class File {
     if (decl instanceof VariableDeclaration) {
       // get the type if we have one
       type = this.resolveExpression(decl.parent!, decl.type)
+      // console.log(decl.name)
       // console.log(decl.type!.map(t => t.str))
       if (!type) {
         // Gonna resolve an import!

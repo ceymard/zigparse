@@ -159,7 +159,7 @@ const potential_fncall = Seq(
   Opt(balanced_expr('(', any, ')')),
 ).map(([i, c]) => c ? '(' + i : i)
 
-export const resolvable_outer_expr = separated_by('.', potential_fncall).map((lst, start, end) => {
+export const resolvable_outer_expr = Seq(Opt('try'), separated_by('.', potential_fncall)).map(second).map((lst, start, end) => {
   return {
     expr: lst,
     start, end
