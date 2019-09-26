@@ -38,6 +38,7 @@ export class PositionedElement extends PropertyChainer {
  */
 export class Declaration extends PositionedElement {
   parent: Scope | null = null
+  doc = ''
   is_public: boolean = false
   name: string = ''
 }

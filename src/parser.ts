@@ -1,4 +1,4 @@
-import { RawRule, Either, Seq, Rule, Z, ZF, Lexer, Lexeme, Opt, Token, any, balanced_expr, first, separated_by, S, second, third } from './libparse'
+import { RawRule, Either, Seq, Rule, Z, ZF, Lexer, Lexeme, Opt, Token, any, Balanced, first, separated_by, S, second, third } from './libparse'
 // import { Variable, Declaration, Enum, Union, ContainerField, Scope, FunctionDecl, Struct } from './pseudo-ast'
 import { Scope, PositionedElement, VariableDeclaration, FunctionDeclaration, StructDeclaration, EnumDeclaration, UnionDeclaration, Position, MemberField, FunctionArgumentDeclaration } from './ast'
 
@@ -81,7 +81,7 @@ const scope = (): Rule<Scope> => Seq(
 const container_field = (base_type: typeof VariableDeclaration) => Seq(
   ident,
   ':',
-  ZF(Either(balanced_expr('(', any, ')'), any), Either('=', ')', '}', ',', ';')).map(lexemes)
+  ZF(Either(Balanced('(', any, ')'), any), Either('=', ')', '}', ',', ';')).map(lexemes)
   // ident
 ).map(([id, _, typ]) => new base_type()
   .set('name', id)
@@ -90,7 +90,7 @@ const container_field = (base_type: typeof VariableDeclaration) => Seq(
 
 
 const func_decl = Seq(
-  pub, Opt(func_qualifiers), 'fn', ident, balanced_expr('(', container_field(FunctionArgumentDeclaration), ')'), // function arguments, they contain variable declarations.
+  pub, Opt(func_qualifiers), 'fn', ident, Balanced('(', container_field(FunctionArgumentDeclaration), ')'), // function arguments, they contain variable declarations.
   ZF(any, Either(';', '{')).map(lexemes), // return type, unparsed for now.
   Either(
     Token(';').map(() => null),
@@ -112,7 +112,7 @@ const var_decl: Rule<VariableDeclaration> = Seq(
   ident,
   Opt(Seq(':', ZF(any, Either('=', '}', ',', ';')).map(lexemes)).map(second)),
   '=',
-  ZF(Either(balanced_expr('{', any, '}'), any), ';').map(lexemes)
+  ZF(Either(Balanced('{', any, '}'), any), ';').map(lexemes)
 ).map(([pub, qual, ident, typ, _, val]) => new VariableDeclaration()
   .set('is_public', !!pub)
   .set('varconst', qual.str)
@@ -132,7 +132,7 @@ const container_decl: Rule<StructDeclaration | EnumDeclaration | UnionDeclaratio
   struct_qualifiers,
   Either(
     'struct',
-    Seq('enum', balanced_expr('(', any, ')')).map(first),
+    Seq('enum', Balanced('(', any, ')')).map(first),
     'union'
   ).map(a => a.str),
   decl_scope
@@ -151,12 +151,12 @@ const modified_ident: Rule<string> = Seq(
   Z(Either('*', '&')),
   ident,
   // several chained array access
-  Z(balanced_expr('[', any, ']')),
+  Z(Balanced('[', any, ']')),
 ).map(([_, i]) => i)
 
 const potential_fncall = Seq(
   modified_ident,
-  Opt(balanced_expr('(', any, ')')), // FIXME this is buggy !
+  Opt(Balanced('(', any, ')')), // FIXME this is buggy !
 ).map(([i, c]) => i)
 
 export const resolvable_outer_expr = Seq(Opt('try'), Opt(Seq(any, '!')), separated_by('.', potential_fncall)).map(third).map((lst, start, end) => {
