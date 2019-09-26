@@ -1,7 +1,9 @@
-import { Scope, Declaration, MemberField, VariableDeclaration, ContainerDeclaration } from "./ast"
+import { Scope, Declaration, MemberField, VariableDeclaration, ContainerDeclaration, FunctionDeclaration, FunctionArgumentDeclaration } from "./ast"
 import { Lexer, Lexeme } from "./libparse"
-import { bare_decl_scope, T } from "./parser"
+import { bare_decl_scope, T, resolvable_outer_expr, lexemes } from "./parser"
 
+import * as pth from 'path'
+import * as fs from 'fs'
 
 // go to definition
 // completion provider
@@ -14,6 +16,7 @@ export class File {
 
   constructor(
     public host: ZigHost,
+    public path: string,
     public lexer: Lexer,
     public scope: Scope,
     public contents: string,
@@ -95,41 +98,130 @@ export class File {
     return scope
   }
 
+  getDeclarationByName(decls: Declaration[], name: string) {
+    for (var d of decls)
+      if (d.name === name) return d
+    return null
+  }
+
   /**
    * Get declarations corresponding to what can complete at a given location.
    *
    * @param file_pos: The 0 based position in the file (not line or column)
    */
-  getCompletionsAt(file_pos: number) {
-    // look at the current token. If it is a dot, then we have to proceed to resolve members.
-    // otherwise, just complete to whatever we have in scope
+  getCompletionsAt(file_pos: number): Declaration[] {
+    const lx = this.lexer.getLexemeAt(file_pos)
+
+    if (!lx) return []
+
+    // If the current token is a dot, then go backwards one step to get the preceding expression.
+    // if it is not, then see if we're on an expression and that we want to potentially replace the current token.
+    const expr = resolvable_outer_expr
+      .map(lexemes).tryParse(lx.is('.') ? lx.input_position - 1 : lx.input_position, this.lexer.lexed, -1)
+    var scope = this.getScopeAt(file_pos)
+    if (!scope || !expr) return []
+    const decl = this.resolveExpression(scope, expr[1])
+    if (!decl) return this.getDeclarationsAt(file_pos)||[]
+    return this.getMembers(decl) || []
+  }
+
+  resolveExpression(scope: Scope, expr: Lexeme[] | null): Declaration | null {
+    if (!expr) return null
+    const exp = resolvable_outer_expr.parse(expr)
+    if (!exp) return null
+
+    const [variable_name, ...path] = exp.expr
+    var iter: Declaration | null = this.getDeclarationByName(this.getDeclarationsInScope(scope), variable_name)
+    if (!iter) return null
+    for (var n of path) {
+      iter = this.getMemberByName(iter, n)
+      if (!iter) return null
+    }
+    return iter
+    // and the get in the scope !
   }
 
   /**
-   * Resolve a type defined by a series of Lexemes.
+   * @param decl a value
    */
-  resolveType(lx: Lexeme[]): Declaration | null {
+  getMembers(decl: Declaration): Declaration[] | null {
+
+    // members of a scope are its declarations, minus member fields
+    // in the case of struct
+    if (decl instanceof Scope)
+      return decl.declarations.filter(d => !(d instanceof MemberField))
+
+    // members of a declaration are its type member fields.
+    var type: Declaration | null = null
+    if (decl instanceof VariableDeclaration) {
+      // get the type if we have one
+      type = this.resolveExpression(decl.parent!, decl.type)
+      // console.log(decl.type!.map(t => t.str))
+      if (!type) {
+        // Gonna resolve an import!
+        if (decl.value && decl.value[0].is('@import')) {
+          // This is where I should check for std !!!
+          var import_path = decl.value![2].str.replace(/"/g, '')
+
+          // FIXME : I'm NOT LOOKING, I'M SETTING IT
+          // FIXME : this is where we should handle builtin as well !
+          var imp = import_path === 'std' ? '/home/chris/zig/zigroot/lib/zig/std/std.zig' : pth.resolve(pth.dirname(decl.value[0]!.filename), import_path)
+          var f = this.host.addFile(imp, fs.readFileSync(imp, 'utf-8'))
+          return f.getMembers(f.scope)
+          // this.path
+          // this.host.addFile()
+        }
+        var value = this.resolveExpression(decl.parent!, decl.value)
+        // console.log(value) // I should get its type...
+      }
+    }
+
+    if (decl instanceof FunctionDeclaration) {
+      type = this.resolveExpression(decl.parent!, decl.return_type)
+    }
+
+    if (type instanceof Scope)
+      return type.declarations.filter(d => d instanceof MemberField)
+
     return null
   }
 
-  resolveMemberExpressionchain(decl: Declaration, chain: string[]) {
-
+  getMemberByName(decl: Declaration, name: string): Declaration | null {
+    var res = this.getMembers(decl)
+    if (!res) return null
+    for (var d of res)
+      if (d.name === name) return d
+    return null
   }
 
   /**
-   *
+   * When given a declaration, iter through its member chain and their types.
    */
-  resolveDotCompletion(token: Lexeme) {
-    // we got here because the current token is .
-    // we're going to check the expression before
+  resolveMemberExpressionchain(decl: Declaration, chain: string[]) {
+    // scopes are their own type and thus give back their scope content.
+    // values have a type -> from which we want the members
+    // functions have a return_type -> from which we want the members
+    const type_decl = (decl instanceof ContainerDeclaration) ? decl : this.resolveTypeDeclaration(decl)
 
-    // the first step is to look for a chainable expression (id.id.fn(...).id)
-    // and start at the first item.
+    if (!type_decl) return null
 
-    // we get it from the current scope, and from there we just look at its member chain.
+    for (var c of chain) {
 
-    // note : if there is no expression, we look for the current scope and figure out wether we're
-    // in a switch or a struct instanciation ; the fields are not resolvable in the same way.
+    }
+  }
+
+  /**
+   * @param decl: a value declaration. It should have a type with stuff in it, or at least a value
+   *    that lets us read into it.
+   */
+  resolveTypeDeclaration(decl: Declaration): Declaration | null {
+    var typ = (decl as any).type as Lexeme[]
+
+    if (decl.is(FunctionArgumentDeclaration))
+      typ = decl.type!
+
+    if (!typ) return null
+    return null
   }
 
 }
@@ -154,7 +246,7 @@ export class ZigHost {
     // const cts = fs.readFileSync(name, 'utf-8')
 
     var start = process.hrtime()
-    const lexer = new Lexer(Object.values(T))
+    const lexer = new Lexer(path, Object.values(T))
     const input = lexer.feed(contents)
     const lex_hrtime = process.hrtime(start)
 
@@ -162,7 +254,7 @@ export class ZigHost {
     const scope = bare_decl_scope(null)().parse(input)!
     const parse_hrtime = process.hrtime(start)
 
-    const res = this.files[path] = new File(this, lexer, scope, contents, lex_hrtime, parse_hrtime)
+    const res = this.files[path] = new File(this, path, lexer, scope, contents, lex_hrtime, parse_hrtime)
     return res
   }
 

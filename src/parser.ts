@@ -30,7 +30,7 @@ export const T = {
 }
 
 const mkset = (l: Lexeme[]) => new Set(l.map(l => l.str))
-const lexemes = (l: any, start: Lexeme, end: Lexeme, input: Lexeme[]) => input.slice(start.input_position, end.input_position)
+export const lexemes = (l: any, start: Lexeme, end: Lexeme, input: Lexeme[]) => input.slice(start.input_position, end.input_position + 1)
 
 const pub = Opt('pub')
 const comptime = Opt('comptime')
@@ -146,12 +146,12 @@ const container_decl: Rule<StructDeclaration | EnumDeclaration | UnionDeclaratio
  * A resolvable expression, where operators are ignored and we only care about
  * symbols (and function calls).
  */
-const modified_ident = Seq(
-  // several pointers and such.
+const modified_ident: Rule<string> = Seq(
+  // pointers and such
   Z(Either('*', '&')),
   ident,
-  Z(balanced_expr('[', any, ']')),
   // several chained array access
+  Z(balanced_expr('[', any, ']')),
 ).map(([_, i]) => i)
 
 const potential_fncall = Seq(

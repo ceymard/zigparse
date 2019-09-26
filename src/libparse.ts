@@ -2,6 +2,7 @@
 export class Lexeme {
 
   constructor(
+    public filename: string,
     public regexp: RegExp,
     public str: string,
     public start: number,
@@ -32,7 +33,7 @@ export class Lexer {
   lexed: Lexeme[] = []
   original_regexps: RegExp[] = []
 
-  constructor(public regexps: RegExp[], public skip = /[\t \s\n]+|\/\/[^\/][^\n]*\n/m) {
+  constructor(public filename: string, public regexps: RegExp[], public skip = /[\t \s\n]+|\/\/[^\/][^\n]*\n/m) {
     this.original_regexps = [...regexps, skip]
     this.regexps = this.original_regexps.map(r => new RegExp(r.source, r.flags + 'y'))
   }
@@ -108,6 +109,7 @@ export class Lexer {
       var m = match.match
       if (match.regexp !== skip) {
         res.push(new Lexeme(
+          this.filename,
           match.regexp,
           m[0],
           idx,
@@ -155,8 +157,10 @@ export class Rule<T> {
     if (res != null) {
       // if (res[0] === pos) throw new Error('what')
       if (this._maps) {
+        var start = step === 1 ? pos : res[0] + 1
+        var end = step === 1 ? res[0] - 1 : pos
         for (var m of this._maps) {
-          res[1] = m(res[1], input[pos], input[res[0]], input)
+          res[1] = m(res[1], input[start], input[end], input)
         }
       }
         // return [res[0], this._maps(res[1], pos, res[0], input)]
