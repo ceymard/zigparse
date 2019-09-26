@@ -129,7 +129,6 @@ export class File {
     if (!expr) return null
     const exp = resolvable_outer_expr.parse(expr)
     if (!exp) return null
-
     const [variable_name, ...path] = exp.expr
     var iter: Declaration | null = this.getDeclarationByName(this.getDeclarationsInScope(scope), variable_name)
     if (!iter) return null
@@ -144,15 +143,18 @@ export class File {
   /**
    * @param decl a value
    */
-  getMembers(decl: Declaration): Declaration[] | null {
+  getMembers(decl: Declaration, as_type = false): Declaration[] | null {
     // members of a scope are its declarations, minus member fields
     // in the case of struct
-    if (decl instanceof Scope)
-      return decl.declarations.filter(d => !(d instanceof MemberField))
 
     // members of a declaration are its type member fields.
     var type: Declaration | null = null
-    if (decl instanceof VariableDeclaration) {
+
+    if (decl instanceof FunctionDeclaration) {
+      type = this.resolveExpression(decl.parent!, decl.return_type)
+    } else if (decl instanceof Scope)
+      return decl.declarations.filter(d => !(d instanceof MemberField))
+    else if (decl instanceof VariableDeclaration) {
       // get the type if we have one
       type = this.resolveExpression(decl.parent!, decl.type)
       // console.log(decl.name)
@@ -174,14 +176,17 @@ export class File {
         var value = this.resolveExpression(decl.parent!, decl.value)
         // handle the value !
         if (!value) return null
+
+        // when do I want that vs return this.getMembers(type) <-- this is when I want the full scope.
+        if (!as_type)
+          return this.getMembers(value)
         type = value
         // console.log(value) // I should get its type...
       }
     }
 
-    if (decl instanceof FunctionDeclaration) {
-      type = this.resolveExpression(decl.parent!, decl.return_type)
-    }
+    if (type instanceof VariableDeclaration)
+      return this.getMembers(type, true)
 
     if (type instanceof Scope) {
       return type.declarations.filter(d => {
@@ -196,8 +201,6 @@ export class File {
       })
 
     }
-    if (type instanceof VariableDeclaration)
-      return this.getMembers(type)
 
     return null
   }

@@ -1,4 +1,4 @@
-import { RawRule, Either, Seq, Rule, Z, ZF, Lexer, Lexeme, Opt, Token, any, balanced_expr, first, separated_by, S, second } from './libparse'
+import { RawRule, Either, Seq, Rule, Z, ZF, Lexer, Lexeme, Opt, Token, any, balanced_expr, first, separated_by, S, second, third } from './libparse'
 // import { Variable, Declaration, Enum, Union, ContainerField, Scope, FunctionDecl, Struct } from './pseudo-ast'
 import { Scope, PositionedElement, VariableDeclaration, FunctionDeclaration, StructDeclaration, EnumDeclaration, UnionDeclaration, Position, MemberField, FunctionArgumentDeclaration } from './ast'
 
@@ -156,10 +156,10 @@ const modified_ident: Rule<string> = Seq(
 
 const potential_fncall = Seq(
   modified_ident,
-  Opt(balanced_expr('(', any, ')')),
-).map(([i, c]) => c ? '(' + i : i)
+  Opt(balanced_expr('(', any, ')')), // FIXME this is buggy !
+).map(([i, c]) => i)
 
-export const resolvable_outer_expr = Seq(Opt('try'), separated_by('.', potential_fncall)).map(second).map((lst, start, end) => {
+export const resolvable_outer_expr = Seq(Opt('try'), Opt(Seq(any, '!')), separated_by('.', potential_fncall)).map(third).map((lst, start, end) => {
   return {
     expr: lst,
     start, end
