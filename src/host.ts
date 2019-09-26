@@ -23,7 +23,7 @@ export class File {
 
   }
 
-  protected getDeclarationsInScope(scope: Scope) {
+  getDeclarationsInScope(scope: Scope) {
 
   }
 
@@ -31,19 +31,18 @@ export class File {
    *
    * @param pos position in the file
    */
-  protected getScopeFromPosition(pos: number) {
+  getScopeFromPosition(pos: number) {
     const lex = this.lexer.getLexemeAt(pos)
     return lex ? this.getScopeFromLexeme(this.scope, lex) : null
   }
 
-  protected getScopeFromLexeme(scope: Scope, lex: Lexeme): Scope {
+  getScopeFromLexeme(scope: Scope, lex: Lexeme): Scope {
     for (var d of scope.declarations) {
 
       if (!(d instanceof Scope))
         continue
 
-      if (lex.input_position >= scope.position.lex_start
-        && lex.input_position <= scope.position.lex_end) {
+      if (lex.input_position >= d.position.lex_start && lex.input_position <= d.position.lex_end) {
           return this.getScopeFromLexeme(d, lex)
         }
     }
@@ -55,7 +54,7 @@ export class File {
    *
    * @param file_pos: The 0 based position in the file (not line or column)
    */
-  public getCompletionsAt(file_pos: number) {
+  getCompletionsAt(file_pos: number) {
 
   }
 

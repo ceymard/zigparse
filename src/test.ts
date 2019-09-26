@@ -58,12 +58,22 @@ export function tree(paths: string[], opt = 'tree' as string) {
   }
 }
 
+export function scope(path: string, pos: number) {
+  const f = host.addFile(path, fs.readFileSync(path, 'utf-8'))
+  const scope = f.getScopeFromPosition(pos)
+  if (scope)
+    printVisit(scope)
+  else
+    console.log(c.redBright('no scope found'))
+}
+
 // export function completion()
 
 
 const args = process.argv.slice(2).map((a, i) => new Lexeme(/./, a, 0, 0, i, 0, 0))
 
 const tree_cmd = S`tree ${Opt(Either('pub', 'silent'))} ${P(any)}`.map(([pub, s]) => tree(s.map(s => s.str), pub ? pub.str : 'tree'))
+const scope_cmd = S`scope ${any} ${any}`.map(([fname, num]) => scope(fname.str, parseInt(num.str)))
 
-const commands = tree_cmd
+const commands = Either(tree_cmd, scope_cmd)
 commands.parse(args)
