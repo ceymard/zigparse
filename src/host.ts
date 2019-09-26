@@ -145,7 +145,6 @@ export class File {
    * @param decl a value
    */
   getMembers(decl: Declaration): Declaration[] | null {
-
     // members of a scope are its declarations, minus member fields
     // in the case of struct
     if (decl instanceof Scope)
@@ -172,6 +171,9 @@ export class File {
           // this.host.addFile()
         }
         var value = this.resolveExpression(decl.parent!, decl.value)
+        // handle the value !
+        if (!value) return null
+        type = value
         // console.log(value) // I should get its type...
       }
     }
@@ -180,8 +182,21 @@ export class File {
       type = this.resolveExpression(decl.parent!, decl.return_type)
     }
 
-    if (type instanceof Scope)
-      return type.declarations.filter(d => d instanceof MemberField)
+    if (type instanceof Scope) {
+      return type.declarations.filter(d => {
+        if (d instanceof MemberField) return d
+        if (d instanceof FunctionDeclaration) {
+          if (d.args.length > 0) {
+            var first_arg = d.args[0]
+            return this.resolveExpression(d, first_arg.type) === type
+          }
+        }
+        return false
+      })
+
+    }
+    if (type instanceof VariableDeclaration)
+      return this.getMembers(type)
 
     return null
   }
