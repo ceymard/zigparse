@@ -49,7 +49,7 @@ export class Lexer {
       return this.lexed[end]
 
     while (end - start > 1) {
-      pos = Math.round((start + end) / 2)
+      pos = Math.floor((start + end) / 2)
       var current = this.lexed[pos]
       if (current.start + 1 > position) {
         end = pos
@@ -61,7 +61,7 @@ export class Lexer {
         return this.lexed[pos]
       }
     }
-    return null
+    return this.lexed[pos]
   }
 
   feed(str: string): Lexeme[] {
@@ -145,7 +145,7 @@ export class Rule<T> {
 
   constructor(
     public _parse: (pos: number, input: Lexeme[], step: 1 | -1) => ParseResult<T>,
-    public _maps?: ((a: T, start: number, end: number, input: Lexeme[]) => T)[]
+    public _maps?: ((a: T, start: Lexeme, end: Lexeme, input: Lexeme[]) => T)[]
   ) {
 
   }
@@ -156,7 +156,7 @@ export class Rule<T> {
       // if (res[0] === pos) throw new Error('what')
       if (this._maps) {
         for (var m of this._maps) {
-          res[1] = m(res[1], pos, res[0], input)
+          res[1] = m(res[1], input[pos], input[res[0]], input)
         }
       }
         // return [res[0], this._maps(res[1], pos, res[0], input)]
@@ -171,7 +171,7 @@ export class Rule<T> {
     return null
   }
 
-  map<U>(fn: (a: T, start: number, end: number, input: Lexeme[]) => U): Rule<U> {
+  map<U>(fn: (a: T, start: Lexeme, end: Lexeme, input: Lexeme[]) => U): Rule<U> {
     return new Rule(this._parse, [...(this._maps||[]), fn] as any) as any as Rule<U>
   }
 
@@ -206,15 +206,6 @@ export function Token(r: RegExp | string) {
   })
 }
 
-
-export function Optional<T extends RawRule<any>>(r: T): InferedRule<T> {
-  var rule = mkRule(r)
-  return new Rule((pos, input, step) => {
-    var p = rule.tryParse(pos, input, step)
-    if (p) return p
-    return [pos, input]
-  }) as InferedRule<T>
-}
 
 export function Seq<A extends RawRule<any>, B extends RawRule<any>, C extends RawRule<any>, D extends RawRule<any>, E extends RawRule<any>, F extends RawRule<any>, G extends RawRule<any>, H extends RawRule<any>, I extends RawRule<any>>(a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H, i: I): Rule<[Result<A>, Result<B>, Result<C>, Result<D>, Result<E>, Result<F>, Result<G>, Result<H>, Result<I>]>
 export function Seq<A extends RawRule<any>, B extends RawRule<any>, C extends RawRule<any>, D extends RawRule<any>, E extends RawRule<any>, F extends RawRule<any>, G extends RawRule<any>, H extends RawRule<any>, I extends RawRule<any>>(a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H, i: I): Rule<[Result<A>, Result<B>, Result<C>, Result<D>, Result<E>, Result<F>, Result<G>, Result<H>, Result<I>]>
@@ -344,7 +335,7 @@ export function Z<T>(_r: RawRule<T>): Rule<T[]> {
 }
 
 
-export function Opt<T>(_r: RawRule<T>): Rule<Result<T> | null> {
+export function Opt<T extends RawRule<any>>(_r: T): Rule<Result<T> | null> {
   const rule = mkRule(_r) as any
   return new Rule((pos, input, step) => {
     const p = rule.tryParse(pos, input, step)

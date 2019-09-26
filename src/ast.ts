@@ -17,12 +17,12 @@ export class Position {
     /**
      * The first lexeme of this element
      */
-    public lex_start: number,
+    public start: Lexeme,
 
     /**
      * The last lexeme position of this element
      */
-    public lex_end: number,
+    public end: Lexeme,
   ) { }
 }
 
@@ -37,6 +37,7 @@ export class PositionedElement extends PropertyChainer {
  * It is always tied to a scope.
  */
 export class Declaration extends PositionedElement {
+  parent: Scope | null = null
   is_public: boolean = false
   name: string = ''
 }
@@ -51,7 +52,15 @@ export class UnprocessedType {
 
 export class VariableDeclaration extends Declaration {
   varconst = 'const'
-  type!: UnprocessedType | ContainerDeclaration // explicit type declaration.
+  value: Lexeme[] | null = null
+  type: Lexeme[] | null = null // explicit type declaration.
+
+  //
+  _resolved_type: Declaration | null = null
+  resolved_type(t?: Declaration) {
+    if (t) this._resolved_type = t
+    return this._resolved_type
+  }
 }
 
 
@@ -60,10 +69,11 @@ export class VariableDeclaration extends Declaration {
  */
 export class Scope extends Declaration {
   // A scope can exist inside another scope.
-  parent: Scope | null = null
   declarations: Declaration[] = []
 
-  handleDeclaration(decl: Declaration) { }
+  handleDeclaration(decl: Declaration) {
+    decl.parent = this
+  }
 
   appendDeclarations(decl: Declaration[]) {
     for (var d of decl) this.handleDeclaration(d)
@@ -99,6 +109,7 @@ export class ContainerDeclaration extends Scope {
   }
 
   handleDeclaration(decl: Declaration) {
+    super.handleDeclaration(decl)
     if (this.isMember(decl))
       this.members.push(decl)
   }
@@ -106,12 +117,16 @@ export class ContainerDeclaration extends Scope {
 }
 
 
+export class FunctionArgumentDeclaration extends VariableDeclaration {
+
+}
+
 /**
  *
  */
 export class FunctionDeclaration extends Scope {
-  args: Declaration[] = []
-  return_type: string = ''
+  args: FunctionArgumentDeclaration[] = []
+  return_type: Lexeme[] | null = null
 }
 
 

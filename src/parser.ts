@@ -1,6 +1,6 @@
-import { RawRule, Either, Seq, Rule, Z, ZF, Lexer, Lexeme, Opt, Token, any, balanced_expr, first, separated_by, S } from './libparse'
+import { RawRule, Either, Seq, Rule, Z, ZF, Lexer, Lexeme, Opt, Token, any, balanced_expr, first, separated_by, S, second } from './libparse'
 // import { Variable, Declaration, Enum, Union, ContainerField, Scope, FunctionDecl, Struct } from './pseudo-ast'
-import { Declaration, Scope, PositionedElement, VariableDeclaration, FunctionDeclaration, StructDeclaration, EnumDeclaration, UnionDeclaration, Position, MemberField } from './ast'
+import { Scope, PositionedElement, VariableDeclaration, FunctionDeclaration, StructDeclaration, EnumDeclaration, UnionDeclaration, Position, MemberField, FunctionArgumentDeclaration } from './ast'
 
 export const T = {
   BLOCK_COMMENT: /([ \t]*\/\/\/[^\n]*\n)+/m,
@@ -30,6 +30,7 @@ export const T = {
 }
 
 const mkset = (l: Lexeme[]) => new Set(l.map(l => l.str))
+const lexemes = (l: any, start: Lexeme, end: Lexeme, input: Lexeme[]) => input.slice(start.input_position, end.input_position)
 
 const pub = Opt('pub')
 const comptime = Opt('comptime')
@@ -43,7 +44,7 @@ const func_qualifiers = Z(Either(
 
 const ident = Token(T.IDENT).map(i => i.str.replace(/@"/, '').replace(/"$/, ''))
 
-function set_position<T extends PositionedElement>(decl: T, start: number, end: number) {
+function set_position<T extends PositionedElement>(decl: T, start: Lexeme, end: Lexeme) {
   decl.set('position', new Position (start, end))
   return decl
 }
@@ -80,7 +81,7 @@ const scope = (): Rule<Scope> => Seq(
 const container_field = (base_type: typeof VariableDeclaration) => Seq(
   ident,
   ':',
-  ZF(any, Either('=', ')', '}', ',', ';')).map(t => t.map(t => t.str).join(' '))
+  ZF(Either(balanced_expr('(', any, ')'), any), Either('=', ')', '}', ',', ';')).map(lexemes)
   // ident
 ).map(([id, _, typ]) => new base_type()
   .set('name', id)
@@ -89,8 +90,8 @@ const container_field = (base_type: typeof VariableDeclaration) => Seq(
 
 
 const func_decl = Seq(
-  pub, Opt(func_qualifiers), 'fn', ident, balanced_expr('(', container_field(VariableDeclaration), ')'), // function arguments, they contain variable declarations.
-  ZF(any, Either(';', '{')).map(t => t.map(t => t.str).join(' ')), // return type, unparsed for now.
+  pub, Opt(func_qualifiers), 'fn', ident, balanced_expr('(', container_field(FunctionArgumentDeclaration), ')'), // function arguments, they contain variable declarations.
+  ZF(any, Either(';', '{')).map(lexemes), // return type, unparsed for now.
   Either(
     Token(';').map(() => null),
     scope
@@ -109,14 +110,15 @@ const var_decl: Rule<VariableDeclaration> = Seq(
   pub,
   qualifiers,
   ident,
-  Opt(Seq(':', ZF(any, Either('=', '}', ',', ';'))).map(([_, t]) => t.map(t => t.str).join(' '))),
+  Opt(Seq(':', ZF(any, Either('=', '}', ',', ';')).map(lexemes)).map(second)),
   '=',
-  ZF(any, ';')
-).map(([pub, qual, ident, typ]) => new VariableDeclaration()
+  ZF(Either(balanced_expr('{', any, '}'), any), ';').map(lexemes)
+).map(([pub, qual, ident, typ, _, val]) => new VariableDeclaration()
   .set('is_public', !!pub)
   .set('varconst', qual.str)
   .set('name', ident)
   .set('type', typ)
+  .set('value', val)
 ).map(set_position)
 
 

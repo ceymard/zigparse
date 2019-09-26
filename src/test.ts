@@ -1,5 +1,5 @@
 import * as fs from 'fs'
-import { PositionedElement, Scope, VariableDeclaration, FunctionDeclaration, StructDeclaration, EnumDeclaration, MemberField, Declaration, ContainerDeclaration } from './ast'
+import { PositionedElement, Scope, VariableDeclaration, FunctionDeclaration, StructDeclaration, EnumDeclaration, MemberField, Declaration, ContainerDeclaration, FunctionArgumentDeclaration } from './ast'
 import { Lexer, Lexeme, S, P, any, Either, Opt } from './libparse'
 import { T, bare_decl_scope } from './parser'
 import c from 'chalk'
@@ -12,33 +12,101 @@ const is = (d: any, d2: any) => d.constructor === d2
 const host = new ZigHost()
 
 
+const kw = [
+  'align',
+  'allowzero',
+  'and',
+  'asm',
+  'async',
+  'await',
+  'break',
+  'catch',
+  'comptime',
+  'const',
+  'continue',
+  'defer',
+  'else',
+  'enum',
+  'errdefer',
+  'error',
+  'export',
+  'extern',
+  'false',
+  'fn',
+  'for',
+  'if',
+  'inline',
+  'nakedcc',
+  'noalias',
+  'null',
+  'or',
+  'orelse',
+  'packed',
+  'promise',
+  'pub',
+  'resume',
+  'return',
+  'linksection',
+  'stdcallcc',
+  'struct',
+  'suspend',
+  'switch',
+  'test',
+  'threadlocal',
+  'true',
+  'try',
+  // 'undefined',
+  'union',
+  'unreachable',
+  'usingnamespace',
+  'var',
+  'volatile',
+  'while',
+
+]
+
+
+function printDeclaration(d: Declaration, indent = '') {
+  var p = (s: string) => console.log(indent + s)
+  var pu = (s: Declaration) => s.is_public ? 'pub ' : ''
+  var lx = (lx: Lexeme[] | null) => (lx||[]).map(l => l.str + (kw.includes(l.str) ? ' ' : '')).join('')
+
+  if (d.is(VariableDeclaration)) {
+    p(c.gray.bold(pu(d) + d.varconst) + ' ' + d.name + (d.type ? c.gray(': ' + lx(d.type)) : '') + c.gray(' = ' + lx(d.value)))
+  } else if (d.is(FunctionDeclaration)) {
+    p(c.green.bold(pu(d) + 'fn')
+      + ' '
+      + d.name
+      + '(' + d.args.map(a => c.green(a.name) + ': ' + c.grey(lx(a.type))).join(', ') + ')'
+      + c.gray(' -> ' + lx(d.return_type))
+    )
+  } else if (d.is(StructDeclaration)) {
+    p(c.red.bold(pu(d) + 'struct') + ' ' + d.name)
+  } else if (d.is(EnumDeclaration)) {
+    p(c.cyan.bold(pu(d) + 'enum') + ' ' + d.name)
+  } else if (d.is(MemberField)) {
+    p(c.yellowBright('.' + d.name + c.gray(': ' + lx(d.type))))
+  } else if (d.is(FunctionArgumentDeclaration)) {
+    // do nothing, they're handled in the function block
+  } else {
+    p(c.red.bold('/!\\ ' + d.constructor.name))
+  }
+}
+
 function printVisit(d: PositionedElement, pub = false, indent = '') {
 
   var mp = (d: PositionedElement) => printVisit(d, pub, indent + '  ')
-  var p = (s: string) => console.log(indent + s)
-  var pu = (s: Declaration) => s.is_public ? 'pub ' : ''
 
   if (
     (d.is(VariableDeclaration) || d instanceof ContainerDeclaration)
     && !d.is(Scope) && pub && !d.is_public) return
 
-  if (d.is(Scope)) {
+  if (d instanceof Declaration && !d.is(Scope)) {
+    printDeclaration(d, indent)
+  }
+
+  if (d instanceof Scope) {
     d.declarations.forEach(mp)
-  } else if (d.is(VariableDeclaration)) {
-    p(c.gray.bold(pu(d) + d.varconst) + ' ' + d.name)
-  } else if (d.is(FunctionDeclaration)) {
-    p(c.green.bold(pu(d) + 'fn') + ' ' + d.name)
-    d.declarations.forEach(mp)
-  } else if (d.is(StructDeclaration)) {
-    p(c.red.bold(pu(d) + 'struct') + ' ' + d.name)
-    d.declarations.forEach(mp)
-  } else if (d.is(EnumDeclaration)) {
-    p(c.cyan.bold(pu(d) + 'enum') + ' ' + d.name)
-    d.declarations.forEach(mp)
-  } else if (d.is(MemberField)) {
-    p(c.yellowBright('.' + d.name))
-  } else {
-    p(c.red.bold('/!\\ ' + d.constructor.name))
   }
 }
 
@@ -60,10 +128,11 @@ export function tree(paths: string[], opt = 'tree' as string) {
 
 export function scope(path: string, pos: number) {
   const f = host.addFile(path, fs.readFileSync(path, 'utf-8'))
-  const scope = f.getScopeFromPosition(pos)
-  if (scope)
-    printVisit(scope)
-  else
+  const scope = f.getScopeAt(pos)
+  if (scope) {
+    const decls = f.getDeclarationsInScope(scope)
+    for (var d of Object.values(decls)) printDeclaration(d)
+  } else
     console.log(c.redBright('no scope found'))
 }
 
