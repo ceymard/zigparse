@@ -1,9 +1,11 @@
 import { Scope, Declaration, MemberField, VariableDeclaration, ContainerDeclaration, FunctionDeclaration, FunctionArgumentDeclaration } from "./ast"
 import { Lexer, Lexeme } from "./libparse"
 import { bare_decl_scope, T, resolvable_outer_expr, lexemes } from "./parser"
+import * as w from 'which'
 
 import * as pth from 'path'
 import * as fs from 'fs'
+import * as cp from 'child_process'
 
 // go to definition
 // completion provider
@@ -164,14 +166,9 @@ export class File {
         if (decl.value && decl.value[0].is('@import')) {
           // This is where I should check for std !!!
           var import_path = decl.value![2].str.replace(/"/g, '')
-
-          // FIXME : I'm NOT LOOKING, I'M SETTING IT
-          // FIXME : this is where we should handle builtin as well !
-          var imp = import_path === 'std' ? '/home/chris/zig/zigroot/lib/zig/std/std.zig' : pth.resolve(pth.dirname(decl.value[0]!.filename), import_path)
-          var f = this.host.addFile(imp, fs.readFileSync(imp, 'utf-8'))
+          var f = this.host.getZigFile(decl.position.start.filename, import_path)
+          if (!f) return null
           return f.getMembers(f.scope)
-          // this.path
-          // this.host.addFile()
         }
         var value = this.resolveExpression(decl.parent!, decl.value)
         // handle the value !
@@ -190,7 +187,7 @@ export class File {
 
     if (type instanceof Scope) {
       return type.declarations.filter(d => {
-        if (d instanceof MemberField) return d
+        if (d instanceof MemberField) return true
         if (d instanceof FunctionDeclaration) {
           if (d.args.length > 0) {
             var first_arg = d.args[0]
@@ -249,11 +246,38 @@ export class File {
 export class ZigHost {
 
   files: {[name: string]: File} = {}
+  zigroot: string = ''
+  librairies: {[name: string]: string} = {}
 
-  constructor() {
-    // should call `zig builtin` to get this
-    // this is a special import done to resolve @symbols.
-    // this.addFile('--builtin--', '')
+  constructor(public zigpath: string) {
+    var path = zigpath && fs.existsSync(zigpath) ? zigpath : w.sync('zig', {nothrow: true})
+    if (path) {
+      path = fs.realpathSync(path)
+      this.zigroot = pth.dirname(path)
+      this.zigpath = path
+      this.librairies['std'] = pth.join(this.zigroot, './lib/zig/std/std.zig')
+    }
+
+    const contents = cp.execSync(`${this.zigpath} builtin`, {encoding: 'utf-8'})
+    this.addFile('builtin', contents)
+  }
+
+  getZigFile(fromfile: string, path: string): File | null {
+    try {
+      if (path === 'builtin') {
+        return this.files['builtin']
+      }
+      if (this.librairies[path]) {
+        return this.addFile(this.librairies[path], fs.readFileSync(this.librairies[path], 'utf-8'))
+      } else {
+
+        path = pth.resolve(pth.dirname(fromfile), path)
+        return this.addFile(path, fs.readFileSync(path, 'utf-8'))
+      }
+    } catch (e) {
+      return null
+    }
+    // should get std and such
   }
 
   addFile(path: string, contents: string) {
