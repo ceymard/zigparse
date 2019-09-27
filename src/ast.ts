@@ -9,10 +9,12 @@ export const ident = Token(T.IDENT).map(i => i.str.replace(/@"/, '').replace(/"$
 const modified_ident: Rule<string> = Seq(
   // pointers and such
   Z(Either('*', '&')),
+  Z(Balanced('[', any, ']')),
+  Opt('const'),
   ident,
   // several chained array access
   Z(Balanced('[', any, ']')),
-).map(([_, i]) => i)
+).map(([_1, _2, _3, i]) => i)
 
 const potential_fncall = Seq(
   modified_ident,
@@ -140,7 +142,7 @@ export class VariableDeclaration extends Declaration {
   }
 
   getMembers(as_type = false): Declaration[] {
-    console.log(this.name)
+    // console.log(this.name)
     // look first at the type. If we find it, then return its definition.
     var typ = this.parent!.resolveExpression(this.type)
     if (typ) return typ.getMembers(true)

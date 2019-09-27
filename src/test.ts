@@ -1,7 +1,6 @@
 import * as fs from 'fs'
 import { PositionedElement, Scope, VariableDeclaration, FunctionDeclaration, StructDeclaration, EnumDeclaration, MemberField, Declaration, ContainerDeclaration, FunctionArgumentDeclaration } from './ast'
 import { Lexer, Lexeme, S, P, any, Either, Opt } from './libparse'
-import { T, bare_decl_scope } from './parser'
 import c from 'chalk'
 import { ZigHost } from '.'
 

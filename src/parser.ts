@@ -1,6 +1,6 @@
-import { RawRule, Either, Seq, Rule, Z, ZF, Lexeme, Opt, Token, any, Balanced, first, S, second, T } from './libparse'
+import { RawRule, Either, Seq, Rule, Z, ZF, Lexeme, Opt, Token, any, Balanced, first, S, second, T, SeqObj } from './libparse'
 // import { Variable, Declaration, Enum, Union, ContainerField, Scope, FunctionDecl, Struct } from './pseudo-ast'
-import { Scope, PositionedElement, VariableDeclaration, FunctionDeclaration, StructDeclaration, EnumDeclaration, UnionDeclaration, Position, MemberField, FunctionArgumentDeclaration } from './ast'
+import { Scope, PositionedElement, VariableDeclaration, FunctionDeclaration, StructDeclaration, EnumDeclaration, UnionDeclaration, Position, MemberField, FunctionArgumentDeclaration, Declaration } from './ast'
 
 const mkset = (l: Lexeme[]) => new Set(l.map(l => l.str))
 export const lexemes = (l: any, start: Lexeme, end: Lexeme, input: Lexeme[]) => input.slice(start.input_position, end.input_position + 1)
@@ -42,17 +42,64 @@ export const bare_decl_scope = (until: RawRule<any> | null) => () => ZF(
 
 const decl_scope = Seq('{', bare_decl_scope('}'), '}').map(([_1, scope, _2]) => scope)
 
+
 const scope = (): Rule<Scope> => Seq(
   '{', // missing if, switch, while and for constructs
   // called *payload in the grammar
   ZF(Either(
     var_decl,
+    control_struct,
     scope,
   ), '}'),
   '}'
 ).map(([_1, decls, _2]) => new Scope()
     .appendDeclarations(decls)
 ).map(set_position)
+
+
+const payload_expression = SeqObj({
+  _lpipe:         '|',
+  is_pointer:     Opt('*').map(r => !!r),
+  ident:          ident,
+  iter_ident:     Opt(Seq(',', ident).map(second)),
+  _rpipe:         '|',
+}).map(({is_pointer, ident, iter_ident}) => { return {is_pointer, ident, iter_ident} })
+
+
+const control_struct = SeqObj({
+  inline:      Opt('inline'),
+  _kind:       Either('for', 'while', 'if'),
+  expr:        Balanced('(', any, ')'),
+  payload:     Opt(payload_expression), // payload !
+  main_scope:  scope,
+  maybe_else:  Opt(SeqObj({
+    kw:           'else',
+    payload:      Opt(payload_expression),
+    else_scope:   scope
+  }))
+}).map(({expr, payload, main_scope, maybe_else}) => {
+  if (payload && payload.ident !== '_') {
+    main_scope.prependDeclarations([
+      new VariableDeclaration()
+        .set('name', payload.ident)
+        .set('value', expr)
+    ])
+  }
+
+  const scope = new Scope()
+  const decls = [main_scope] as Declaration[]
+
+  if (maybe_else) {
+    var sc = maybe_else.else_scope
+    if (sc) {
+      decls.push(sc)
+    }
+  }
+
+  scope.prependDeclarations(decls)
+  return scope
+}).map(set_position)
+
 
 
 const container_field = (base_type: typeof VariableDeclaration) => Seq(

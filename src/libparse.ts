@@ -243,6 +243,28 @@ export function Seq(..._rules: any[]): Rule<any> {
 }
 
 
+export function SeqObj<T extends {[name: string]: RawRule<any>}>(_rules: T): Rule<{[K in keyof T]: Result<T[K]>}> {
+  var rules = mkRules(Object.values(_rules))
+  var keys = Object.keys(_rules)
+  return new Rule<any>((pos, input, step) => {
+    var p: ParseResult<any>
+    var res = {} as any
+
+    var start = step === 1 ? 0 : rules.length - 1
+    var end = step === 1 ? rules.length : -1
+    for (var i = start; i !== end; i += step) {
+      if (!(p = rules[i].tryParse(pos, input, step)))
+        return null
+      else {
+        [pos, res[keys[i]]] = p
+      }
+    }
+
+    return [pos, res]
+  })
+}
+
+
 export function S<A extends RawRule<any>, B extends RawRule<any>, C extends RawRule<any>, D extends RawRule<any>, E extends RawRule<any>, F extends RawRule<any>, G extends RawRule<any>, H extends RawRule<any>, I extends RawRule<any>>(t: TemplateStringsArray, ...rules: [A, B, C, D, E, F, G, H, I]): Rule<[Result<A>, Result<B>, Result<C>, Result<D>, Result<E>, Result<F>, Result<G>, Result<H>, Result<I>]>
 export function S<A extends RawRule<any>, B extends RawRule<any>, C extends RawRule<any>, D extends RawRule<any>, E extends RawRule<any>, F extends RawRule<any>, G extends RawRule<any>, H extends RawRule<any>, I extends RawRule<any>>(t: TemplateStringsArray, ...rules: [A, B, C, D, E, F, G, H, I]): Rule<[Result<A>, Result<B>, Result<C>, Result<D>, Result<E>, Result<F>, Result<G>, Result<H>, Result<I>]>
 export function S<A extends RawRule<any>, B extends RawRule<any>, C extends RawRule<any>, D extends RawRule<any>, E extends RawRule<any>, F extends RawRule<any>, G extends RawRule<any>, H extends RawRule<any>, I extends RawRule<any>>(t: TemplateStringsArray, ...rules: [A, B, C, D, E, F, G, H, I]): Rule<[Result<A>, Result<B>, Result<C>, Result<D>, Result<E>, Result<F>, Result<G>, Result<H>, Result<I>]>
@@ -440,6 +462,9 @@ export function Between<T>(_start: RawRule<any>, _rule: RawRule<T>, _end: RawRul
 }
 
 
+/**
+ * I should remove this as it can't reliably parse backwards.
+ */
 export function ZF<T>(_r: RawRule<T>, until?: RawRule<any> | null): Rule<T[]> {
   const rule = mkRule(_r)
   const _until = until ? mkRule(until) : null

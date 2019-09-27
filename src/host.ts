@@ -123,6 +123,7 @@ export class File {
     var scope = this.getScopeAt(file_pos)
     if (!scope || !expr) return []
     const decl = scope.resolveExpression(expr[1])
+    if (!decl && lx.is('.')) return []
     if (!decl) return this.getDeclarationsAt(file_pos)||[]
     return decl.getMembers() || []
   }
