@@ -250,7 +250,7 @@ export class ZigHost {
   librairies: {[name: string]: string} = {}
 
   constructor(public zigpath: string) {
-    var path = zigpath && fs.existsSync(zigpath) ? zigpath : w.sync('zig', {nothrow: true})
+    var path = zigpath && fs.existsSync(zigpath) && fs.statSync(zigpath).isFile() ? zigpath : w.sync('zig', {nothrow: true})
     if (path) {
       path = fs.realpathSync(path)
       this.zigroot = pth.dirname(path)
@@ -260,6 +260,13 @@ export class ZigHost {
 
     const contents = cp.execSync(`${this.zigpath} builtin`, {encoding: 'utf-8'})
     this.addFile('builtin', contents)
+  }
+
+  /**
+   * Get several c files, generally imports
+   */
+  getCFile(fromfile: string, paths: string[]): File | null {
+    return null
   }
 
   getZigFile(fromfile: string, path: string): File | null {

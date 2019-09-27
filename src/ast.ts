@@ -1,5 +1,13 @@
 import { Lexeme } from "./libparse"
 
+
+export function reJoin(lex: Lexeme[] | null, prefix = '') {
+  if (!lex) return ''
+  // fixme need list of rejoinders
+  return prefix + lex.map(l => l.str).join('')
+}
+
+
 export class PropertyChainer {
   is<T extends {new (...a: any[]): any}>(kls: T): this is InstanceType<T> {
     return this.constructor === kls
@@ -41,6 +49,10 @@ export class Declaration extends PositionedElement {
   doc = ''
   is_public: boolean = false
   name: string = ''
+
+  fullName() {
+    return this.name
+  }
 }
 
 
@@ -61,6 +73,10 @@ export class VariableDeclaration extends Declaration {
   resolved_type(t?: Declaration) {
     if (t) this._resolved_type = t
     return this._resolved_type
+  }
+
+  fullName() {
+    return `${this.name}${reJoin(this.type, ': ')}`
   }
 }
 
@@ -128,6 +144,10 @@ export class FunctionArgumentDeclaration extends VariableDeclaration {
 export class FunctionDeclaration extends Scope {
   args: FunctionArgumentDeclaration[] = []
   return_type: Lexeme[] | null = null
+
+  fullName() {
+    return `${this.name}(${this.args.map(a => a.fullName()).join(', ')})${reJoin(this.return_type, ': ')}`
+  }
 }
 
 
