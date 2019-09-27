@@ -1,37 +1,14 @@
-import { RawRule, Either, Seq, Rule, Z, ZF, Lexer, Lexeme, Opt, Token, any, Balanced, first, separated_by, S, second, third } from './libparse'
+import { RawRule, Either, Seq, Rule, Z, ZF, Lexeme, Opt, Token, any, Balanced, first, S, second, T } from './libparse'
 // import { Variable, Declaration, Enum, Union, ContainerField, Scope, FunctionDecl, Struct } from './pseudo-ast'
 import { Scope, PositionedElement, VariableDeclaration, FunctionDeclaration, StructDeclaration, EnumDeclaration, UnionDeclaration, Position, MemberField, FunctionArgumentDeclaration } from './ast'
-
-export const T = {
-  BLOCK_COMMENT: /([ \t]*\/\/\/[^\n]*\n)+/m,
-  STR: /"(\\"|.)*"|\\\\[^\n]*\n(\s*\\\\[^\n]*\n)*/,
-  CHAR: /'(\\'|.)*'/,
-  IDENT: /@?\w+|@"[^"]+"/,
-  OP: new RegExp([
-    /&=|&/,
-    /\*%=|\*%|\*=|\*\*|\*/,
-    /\^=?/,
-    /\.\.\.|\.\.|\.\?|\.\*|\./,
-    /=>|==|=/,
-    /!=|!/,
-    /<<=|<=|<<|</,
-    /-%=|-%|->|-=|-/,
-    /%=|%/,
-    /\|=|\|\||\|/,
-    /\+%=|\+%|\+=|\+\+|\+/,
-    /\[\*c\]|\[\*\]/,
-    /\?/,
-    />>=|>=|>>|>/,
-    /\/=|\/(?!\/)/,
-    /~/
-  ].map(r => r.source).join('|')),
-  // /&=?|\*[\*=%]?=?|==?=?|\./,
-  CONTROL: /\(|\{|\[|\]|\}|\)|;|:|,/,
-}
 
 const mkset = (l: Lexeme[]) => new Set(l.map(l => l.str))
 export const lexemes = (l: any, start: Lexeme, end: Lexeme, input: Lexeme[]) => input.slice(start.input_position, end.input_position + 1)
 
+const doc = Opt(T.BLOCK_COMMENT).map(d => {
+  if (!d) return ''
+  return d.str.replace(/^\s*\/\/\/\s*/g, '')
+})
 const pub = Opt('pub')
 const comptime = Opt('comptime')
 const qualifiers = Either('var', 'const')
@@ -42,7 +19,7 @@ const func_qualifiers = Z(Either(
   'export'
 ))
 
-const ident = Token(T.IDENT).map(i => i.str.replace(/@"/, '').replace(/"$/, ''))
+export const ident = Token(T.IDENT).map(i => i.str.replace(/@"/, '').replace(/"$/, ''))
 
 function set_position<T extends PositionedElement>(decl: T, start: Lexeme, end: Lexeme) {
   decl.set('position', new Position (start, end))
@@ -79,24 +56,27 @@ const scope = (): Rule<Scope> => Seq(
 
 
 const container_field = (base_type: typeof VariableDeclaration) => Seq(
+  doc,
   ident,
   ':',
   ZF(Either(Balanced('(', any, ')'), any), Either('=', ')', '}', ',', ';')).map(lexemes)
   // ident
-).map(([id, _, typ]) => new base_type()
+).map(([doc, id, _, typ]) => new base_type()
+  .set('doc', doc)
   .set('name', id)
   .set('type', typ)
 ).map(set_position)
 
 
 const func_decl = Seq(
-  pub, Opt(func_qualifiers), 'fn', ident, Balanced('(', container_field(FunctionArgumentDeclaration), ')'), // function arguments, they contain variable declarations.
+  doc, pub, Opt(func_qualifiers), 'fn', ident, Balanced('(', container_field(FunctionArgumentDeclaration), ')'), // function arguments, they contain variable declarations.
   ZF(any, Either(';', '{')).map(lexemes), // return type, unparsed for now.
   Either(
     Token(';').map(() => null),
     scope
   )
-).map(([pub, qual, _1, id, args, retr, maybe_scope]) => new FunctionDeclaration()
+).map(([doc, pub, qual, _1, id, args, retr, maybe_scope]) => new FunctionDeclaration()
+  .set('doc', doc)
   .set('is_public', !!pub)
   .set('name', id)
   .set('args', args)
@@ -107,13 +87,15 @@ const func_decl = Seq(
 
 
 const var_decl: Rule<VariableDeclaration> = Seq(
+  doc,
   pub,
   qualifiers,
   ident,
   Opt(Seq(':', ZF(any, Either('=', '}', ',', ';')).map(lexemes)).map(second)),
   '=',
   ZF(Either(Balanced('{', any, '}'), any), ';').map(lexemes)
-).map(([pub, qual, ident, typ, _, val]) => new VariableDeclaration()
+).map(([doc, pub, qual, ident, typ, _, val]) => new VariableDeclaration()
+  .set('doc', doc)
   .set('is_public', !!pub)
   .set('varconst', qual.str)
   .set('name', ident)
@@ -141,27 +123,3 @@ const container_decl: Rule<StructDeclaration | EnumDeclaration | UnionDeclaratio
   .set('name', ident)
   .appendDeclarations(scope.declarations)
 ).map(set_position)
-
-/**
- * A resolvable expression, where operators are ignored and we only care about
- * symbols (and function calls).
- */
-const modified_ident: Rule<string> = Seq(
-  // pointers and such
-  Z(Either('*', '&')),
-  ident,
-  // several chained array access
-  Z(Balanced('[', any, ']')),
-).map(([_, i]) => i)
-
-const potential_fncall = Seq(
-  modified_ident,
-  Opt(Balanced('(', any, ')')),
-).map(([i, c]) => i)
-
-export const resolvable_outer_expr = Seq(Opt('try'), Opt(Seq(any, '!')), separated_by('.', potential_fncall)).map(third).map((lst, start, end) => {
-  return {
-    expr: lst,
-    start, end
-  }
-})

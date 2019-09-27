@@ -1,6 +1,6 @@
-import { Scope, Declaration, MemberField, VariableDeclaration, ContainerDeclaration, FunctionDeclaration, FunctionArgumentDeclaration } from "./ast"
-import { Lexer, Lexeme } from "./libparse"
-import { bare_decl_scope, T, resolvable_outer_expr, lexemes } from "./parser"
+import { Lexer, Lexeme, T } from "./libparse"
+import { bare_decl_scope, lexemes } from "./parser"
+import { Scope, Declaration, MemberField, VariableDeclaration, ContainerDeclaration, FunctionArgumentDeclaration, resolvable_outer_expr } from "./ast"
 import * as w from 'which'
 
 import * as pth from 'path'
@@ -122,92 +122,9 @@ export class File {
       .map(lexemes).tryParse(lx.is('.') ? lx.input_position - 1 : lx.input_position, this.lexer.lexed, -1)
     var scope = this.getScopeAt(file_pos)
     if (!scope || !expr) return []
-    const decl = this.resolveExpression(scope, expr[1])
+    const decl = scope.resolveExpression(expr[1])
     if (!decl) return this.getDeclarationsAt(file_pos)||[]
-    return this.getMembers(decl) || []
-  }
-
-  resolveExpression(scope: Scope, expr: Lexeme[] | null): Declaration | null {
-    if (!expr) return null
-    const exp = resolvable_outer_expr.parse(expr)
-    if (!exp) return null
-    const [variable_name, ...path] = exp.expr
-    var iter: Declaration | null = this.getDeclarationByName(this.getDeclarationsInScope(scope), variable_name)
-    if (!iter) return null
-    for (var n of path) {
-      iter = this.getMemberByName(iter, n)
-      if (!iter) return null
-    }
-    return iter
-    // and the get in the scope !
-  }
-
-  /**
-   * @param decl a value
-   */
-  getMembers(decl: Declaration, as_type = false): Declaration[] | null {
-    // members of a scope are its declarations, minus member fields
-    // in the case of struct
-
-    // members of a declaration are its type member fields.
-    var type: Declaration | null = null
-
-    if (decl instanceof FunctionDeclaration) {
-      type = this.resolveExpression(decl.parent!, decl.return_type)
-    } else if (decl instanceof Scope)
-      return decl.declarations.filter(d => !(d instanceof MemberField))
-    else if (decl instanceof VariableDeclaration) {
-      // get the type if we have one
-      type = this.resolveExpression(decl.parent!, decl.type)
-      // console.log(decl.name)
-      // console.log(decl.type!.map(t => t.str))
-      if (!type) {
-        // Gonna resolve an import!
-        if (decl.value && decl.value[0].is('@import')) {
-          // This is where I should check for std !!!
-          var import_path = decl.value![2].str.replace(/"/g, '')
-          var f = this.host.getZigFile(decl.file.path, import_path)
-          if (!f) return null
-          return f.getMembers(f.scope)
-        }
-        var value = this.resolveExpression(decl.parent!, decl.value)
-        // handle the value !
-        if (!value) return null
-
-        // when do I want that vs return this.getMembers(type) <-- this is when I want the full scope.
-        if (!as_type)
-          return this.getMembers(value)
-        type = value
-        // console.log(value) // I should get its type...
-      }
-    }
-
-    if (type instanceof VariableDeclaration)
-      return this.getMembers(type, true)
-
-    if (type instanceof Scope) {
-      return type.declarations.filter(d => {
-        if (d instanceof MemberField) return true
-        if (d instanceof FunctionDeclaration) {
-          if (d.args.length > 0) {
-            var first_arg = d.args[0]
-            return this.resolveExpression(d, first_arg.type) === type
-          }
-        }
-        return false
-      })
-
-    }
-
-    return null
-  }
-
-  getMemberByName(decl: Declaration, name: string): Declaration | null {
-    var res = this.getMembers(decl)
-    if (!res) return null
-    for (var d of res)
-      if (d.name === name) return d
-    return null
+    return decl.getMembers() || []
   }
 
   /**

@@ -1,5 +1,31 @@
-import { Lexeme } from "./libparse"
 import { File } from "./host"
+import { Lexeme, Rule, Opt, Balanced, any, Z, Either, Seq, separated_by, third, T, Token } from "./libparse"
+
+export const ident = Token(T.IDENT).map(i => i.str.replace(/@"/, '').replace(/"$/, ''))
+/**
+ * A resolvable expression, where operators are ignored and we only care about
+ * symbols (and function calls).
+ */
+const modified_ident: Rule<string> = Seq(
+  // pointers and such
+  Z(Either('*', '&')),
+  ident,
+  // several chained array access
+  Z(Balanced('[', any, ']')),
+).map(([_, i]) => i)
+
+const potential_fncall = Seq(
+  modified_ident,
+  Opt(Balanced('(', any, ')')),
+).map(([i, c]) => i)
+
+export const resolvable_outer_expr = Seq(Opt('try'), Opt(Seq(any, '!')), separated_by('.', potential_fncall)).map(third).map((lst, start, end) => {
+  return {
+    expr: lst,
+    start, end
+  }
+})
+
 
 const spaces: {[name: string]: string} = {
   const: 'const '
@@ -62,6 +88,31 @@ export class Declaration extends PositionedElement {
   fullName() {
     return this.name
   }
+
+  /**
+   * Get the members of the given declaration.
+   * For variables, returns the list of .names
+   *
+  */
+  getMembers(as_type = false): Declaration[] {
+    return []
+  }
+
+  getMemberByName(name: string): Declaration | null {
+    var res = this.getMembers()
+    for (var d of res)
+      if (d.name === name) return d
+    return null
+  }
+
+  getMemberByPath(path: string[]): Declaration | null {
+    if (path.length === 0) return this
+    var [here, ...rest] = path
+    var sub = this.getMemberByName(here)
+    if (!sub) return null
+    return sub.getMemberByPath(rest)
+  }
+
 }
 
 
@@ -87,6 +138,32 @@ export class VariableDeclaration extends Declaration {
   fullName() {
     return `${this.name}${reJoin(this.type, ': ')}`
   }
+
+  getMembers(as_type = false): Declaration[] {
+    // look first at the type. If we find it, then return its definition.
+    var typ = this.parent!.resolveExpression(this.type)
+    if (typ) return typ.getMembers(true)
+
+    // if we didn't find a type, then we look at the value.
+
+    // First try to see if it's an import
+    if (this.value && this.value[0].is('@import')) {
+      var import_path = this.value![2].str.replace(/"/g, '')
+      var f = this.file.host.getZigFile(this.file.path, import_path)
+      if (!f) return []
+      return f.scope.getMembers()
+    }
+
+    // then try to see if it's a cImport
+    // TODO
+
+    // At last, just look at the value, try to resolve it and print its members.
+    var val = this.parent!.resolveExpression(this.value)
+    if (!val) return []
+
+    return val.getMembers(as_type)
+  }
+
 }
 
 
@@ -117,6 +194,40 @@ export class Scope extends Declaration {
     this.file = f
     for (var d of this.declarations)
       d.setFile(f)
+  }
+
+  getMembers() {
+    return this.declarations
+  }
+
+  getDeclarations(): Declaration[] {
+    if (this.parent) return [...this.parent.getDeclarations(), ...this.declarations]
+    return this.declarations
+  }
+
+  /**
+   *
+   */
+  getDeclarationByName(name: string) {
+    for (var d of this.getDeclarations()) {
+      if (d.name === name)
+        return d
+    }
+    return null
+  }
+
+  resolveExpression(expr: Lexeme[] | null): Declaration | null {
+    if (!expr) return null
+    const exp = resolvable_outer_expr.parse(expr)
+    if (!exp) return null
+    const [variable_name, ...path] = exp.expr
+    var iter: Declaration | null = this.getDeclarationByName(variable_name)
+    if (!iter) return null
+    for (var n of path) {
+      iter = iter.getMemberByName(n)
+      if (!iter) return null
+    }
+    return iter
   }
 
 }
@@ -162,6 +273,12 @@ export class FunctionDeclaration extends Scope {
   fullName() {
     return `${this.name}(${this.args.map(a => a.fullName()).join(', ')})${reJoin(this.return_type, ': ')}`
   }
+
+  getMembers() {
+    var typ = this.parent!.resolveExpression(this.return_type)
+    if (!typ) return []
+    return typ.getMembers(true)
+  }
 }
 
 
@@ -171,6 +288,24 @@ export class MemberField extends VariableDeclaration {
 
 export class MemberedContainer extends ContainerDeclaration {
   // members:
+
+  getMembers(as_type = false): Declaration[] {
+    if (as_type) {
+      return this.declarations.filter(d => {
+        if (d instanceof MemberField) return true
+        if (d instanceof FunctionDeclaration) {
+          if (d.args.length > 0) {
+            var first_arg = d.args[0]
+            return d.resolveExpression(first_arg.type) === this
+          }
+        }
+        return false
+      })
+    }
+
+    // as value
+    return this.declarations.filter(d => !(d instanceof MemberField))
+  }
 }
 
 
