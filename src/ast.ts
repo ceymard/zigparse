@@ -1,33 +1,75 @@
 import { File } from "./host"
-import { Lexeme, Rule, Opt, Balanced, any, Z, Either, Seq, separated_by, third, T, Token } from "./libparse"
+import { Lexeme, Opt, Balanced, any, Z, Either, Seq, separated_by, third, T, Token, S, SeqObj } from "./libparse"
 
 export const ident = Token(T.IDENT).map(i => i.str.replace(/@"/, '').replace(/"$/, ''))
 
-type LookupFn = (from_decl: Declaration) => Declaration | null
+type LookupFn = (from_decl: Declaration, only_public: boolean) => { decl: Declaration | null, pubs: boolean }
 
 /**
  * A resolvable expression, where operators are ignored and we only care about
  * symbols (and function calls).
  */
-const modified_ident: Rule<string> = Seq(
+const modified_ident = SeqObj({
   // pointers and such
-  Z(Either('*', '&')),
-  Z(Balanced('[', any, ']')),
-  Opt('const'),
+  pointer_access: Z(Either('*', '&')),
+  array_def: Z(Balanced('[', any, ']')),
+  kw_const: Opt('const'),
   ident,
   // several chained array access
-  Z(Balanced('[', any, ']')),
-).map(([_1, _2, _3, i]) => i)
+  array_index: Z(Balanced('[', any, ']')),
+})
+.map(({ident}) => (from_decl: Declaration, only_public: boolean) => {
+  var decl = from_decl.getMemberByName(ident, only_public)
+  return {decl, pubs: only_public}
+})
 
-const potential_fncall = Seq(
-  modified_ident,
-  Opt(Balanced('(', any, ')')),
-).map(([i, c]) => i)
+// const star = ;
 
-export const resolvable_outer_expr = Seq(Opt('try'), Opt(Seq(any, '!')), separated_by('.', potential_fncall)).map(third).map((lst, start, end) => {
-  return {
-    expr: lst,
-    start, end
+const potential_fncall = SeqObj({
+  id: modified_ident,
+  is_fn: Opt(Balanced('(', any, ')')),
+}).map(({id, is_fn}) => (from_decl: Declaration, only_public: boolean) => {
+  const {decl, pubs} = id(from_decl, only_public)
+  // FIXME : should check for function call. but we would need to know if being called from a value
+  // or not.
+  return { pubs, decl: decl}
+})
+
+
+const cimport = SeqObj({
+  start: '@cImport',
+  contents: Balanced('(', any, ')')
+})
+.map(() => (from_decl: Declaration) => {
+  console.log('cimport !')
+  var f = from_decl.file.host.getCFile()
+  return { pubs: false, decl: f ? f.scope : null }
+})
+
+
+const impor = S`@import ( ${T.STR} )`
+.map(s => (from_decl: Declaration) => {
+  // ignore the previous declaration
+  var the_file = from_decl.file.host.getZigFile(from_decl.file.path, s.str.slice(1, -1))
+  if (!the_file) return null
+  return { pubs: true, decl: the_file.scope }
+})
+
+
+export const resolvable_outer_expr = SeqObj({
+  _try: Opt('try'),
+  _err: Opt(Seq(any, '!')),
+  lst: separated_by('.', Either(cimport, impor, potential_fncall)),
+}).map(({lst}) => {
+  return (decl: Declaration): Declaration | null => {
+    if (lst.length === 0) return null
+    var resolve = (decl: Declaration, pubs: boolean, index: number): Declaration | null => {
+      var res = lst[index](decl, pubs)
+      if (!res || !res.decl) return null
+      if (index === lst.length - 1) return res.decl
+      return resolve(res.decl, res.pubs, index + 1)
+    }
+    return resolve(decl, false, 0)
   }
 })
 
@@ -104,10 +146,13 @@ export class Declaration extends PositionedElement {
     return []
   }
 
-  getMemberByName(name: string): Declaration | null {
+  getMemberByName(name: string, filter_public = false): Declaration | null {
     var res = this.getMembers()
     for (var d of res)
-      if (d.name === name) return d
+      if (d.name === name) {
+        if (filter_public && !d.is_public) return null
+        return d
+      }
     return null
   }
 
@@ -216,7 +261,7 @@ export class Scope extends Declaration {
   }
 
   getMembers() {
-    return this.declarations
+    return this.getDeclarations()
   }
 
   getDeclarations(): Declaration[] {
@@ -239,14 +284,7 @@ export class Scope extends Declaration {
     if (!expr) return null
     const exp = resolvable_outer_expr.parse(expr)
     if (!exp) return null
-    const [variable_name, ...path] = exp.expr
-    var iter: Declaration | null = this.getDeclarationByName(variable_name)
-    if (!iter) return null
-    for (var n of path) {
-      iter = iter.getMemberByName(n)
-      if (!iter) return null
-    }
-    return iter
+    return exp(this)
   }
 
 }

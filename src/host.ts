@@ -179,7 +179,7 @@ export class ZigHost {
   zigroot: string = ''
   librairies: {[name: string]: string} = {}
 
-  constructor(public zigpath: string) {
+  constructor(public zigpath: string, public ws_root: string) {
     var path = zigpath && fs.existsSync(zigpath) && fs.statSync(zigpath).isFile() ? zigpath : w.sync('zig', {nothrow: true})
     if (path) {
       path = fs.realpathSync(path)
@@ -195,7 +195,27 @@ export class ZigHost {
   /**
    * Get several c files, generally imports
    */
-  getCFile(fromfile: string, paths: string[]): File | null {
+  getCFile(): File | null {
+    const zig_cache_dir = pth.resolve(this.ws_root, `zig-cache${pth.sep}o`)
+    var dirs = fs.readdirSync(zig_cache_dir)
+    var fnames = [] as {ms: number, path: string}[]
+    for (var d of dirs) {
+      var p = pth.resolve(pth.resolve(zig_cache_dir, d), 'cimport.zig')
+      try {
+        var st = fs.statSync(p)
+        if (st.isFile()) {
+          fnames.push({ms: st.mtimeMs, path: p})
+        }
+      } catch (e) { continue }
+    }
+
+    console.log(fnames)
+    fnames.sort((a, b) => a.ms < b.ms ? 1 : a.ms > b.ms ? -1 : 0)
+    if (fnames[0]) {
+      var cts = fs.readFileSync(fnames[0].path, 'utf-8')
+      // return the c import.
+      return this.addFile(fnames[0].path, cts)
+    }
     return null
   }
 
