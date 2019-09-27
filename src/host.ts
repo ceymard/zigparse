@@ -135,7 +135,9 @@ export class File {
     const decl = scope.resolveExpression(expr[1])
     if (!decl && lx.is('.')) return []
     if (!decl) return this.getDeclarationsAt(file_pos)||[]
-    return decl.getMembers() || []
+    var members = decl.getMembers() || []
+    if (decl.file !== scope.file) return members.filter(m => m.is_public)
+    return members
   }
 
   /**

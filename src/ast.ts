@@ -2,6 +2,9 @@ import { File } from "./host"
 import { Lexeme, Rule, Opt, Balanced, any, Z, Either, Seq, separated_by, third, T, Token } from "./libparse"
 
 export const ident = Token(T.IDENT).map(i => i.str.replace(/@"/, '').replace(/"$/, ''))
+
+type LookupFn = (from_decl: Declaration) => Declaration | null
+
 /**
  * A resolvable expression, where operators are ignored and we only care about
  * symbols (and function calls).
