@@ -1,10 +1,13 @@
 import { Lexeme } from "./libparse"
 
+const spaces: {[name: string]: string} = {
+  const: 'const '
+}
 
 export function reJoin(lex: Lexeme[] | null, prefix = '') {
   if (!lex) return ''
   // fixme need list of rejoinders
-  return prefix + lex.map(l => l.str).join('')
+  return prefix + lex.map(l => spaces[l.str] ? spaces[l.str] : l.str).join('')
 }
 
 
