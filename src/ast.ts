@@ -142,7 +142,6 @@ export class VariableDeclaration extends Declaration {
   }
 
   getMembers(as_type = false): Declaration[] {
-    // console.log(this.name)
     // look first at the type. If we find it, then return its definition.
     var typ = this.parent!.resolveExpression(this.type)
     if (typ) return typ.getMembers(true)
@@ -154,6 +153,7 @@ export class VariableDeclaration extends Declaration {
       var import_path = this.value![2].str.replace(/"/g, '')
       var f = this.file.host.getZigFile(this.file.path, import_path)
       if (!f) return []
+      this.doc = f.scope.doc // also import its documentation if any
       return f.scope.getMembers()
     }
 

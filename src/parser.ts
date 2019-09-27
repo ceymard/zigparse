@@ -60,8 +60,12 @@ const scope = (): Rule<Scope> => Seq(
 const payload_expression = SeqObj({
   _lpipe:         '|',
   is_pointer:     Opt('*').map(r => !!r),
-  ident:          ident,
-  iter_ident:     Opt(Seq(',', ident).map(second)),
+  ident:          ident.map(i => new VariableDeclaration()
+                    .set('name', i)
+                  ).map(set_position),
+  iter_ident:     Opt(Seq(',', ident).map(second).map(i => new VariableDeclaration()
+                    .set('name', i)
+                  ).map(set_position)),
   _rpipe:         '|',
 }).map(({is_pointer, ident, iter_ident}) => { return {is_pointer, ident, iter_ident} })
 
@@ -78,10 +82,9 @@ const control_struct = SeqObj({
     else_scope:   scope
   }))
 }).map(({expr, payload, main_scope, maybe_else}) => {
-  if (payload && payload.ident !== '_') {
+  if (payload && payload.iter_ident && payload.ident.name !== '_') {
     main_scope.prependDeclarations([
-      new VariableDeclaration()
-        .set('name', payload.ident)
+      payload.ident
         .set('value', expr)
     ])
   }
