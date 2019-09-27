@@ -145,7 +145,7 @@ export function complete(path: string, pos: number) {
 // export function completion()
 
 
-const args = process.argv.slice(2).map((a, i) => new Lexeme('-', /./, a, 0, 0, i, 0, 0))
+const args = process.argv.slice(2).map((a, i) => new Lexeme(/./, a, 0, 0, i, 0, 0))
 
 const tree_cmd = S`tree ${Opt(Either('pub', 'silent'))} ${P(any)}`.map(([pub, s]) => tree(s.map(s => s.str), pub ? pub.str : 'tree'))
 const scope_cmd = S`scope ${any} ${any}`.map(([fname, num]) => scope(fname.str, parseInt(num.str)))

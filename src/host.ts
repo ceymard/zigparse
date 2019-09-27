@@ -166,7 +166,7 @@ export class File {
         if (decl.value && decl.value[0].is('@import')) {
           // This is where I should check for std !!!
           var import_path = decl.value![2].str.replace(/"/g, '')
-          var f = this.host.getZigFile(decl.position.start.filename, import_path)
+          var f = this.host.getZigFile(decl.file.path, import_path)
           if (!f) return null
           return f.getMembers(f.scope)
         }
@@ -296,7 +296,7 @@ export class ZigHost {
     // const cts = fs.readFileSync(name, 'utf-8')
 
     var start = process.hrtime()
-    const lexer = new Lexer(path, Object.values(T))
+    const lexer = new Lexer(Object.values(T))
     const input = lexer.feed(contents)
     const lex_hrtime = process.hrtime(start)
 
@@ -305,6 +305,7 @@ export class ZigHost {
     const parse_hrtime = process.hrtime(start)
 
     const res = this.files[path] = new File(this, path, lexer, scope, contents, lex_hrtime, parse_hrtime)
+    scope.setFile(res)
     return res
   }
 

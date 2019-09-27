@@ -1,4 +1,5 @@
 import { Lexeme } from "./libparse"
+import { File } from "./host"
 
 const spaces: {[name: string]: string} = {
   const: 'const '
@@ -40,6 +41,11 @@ export class Position {
 
 export class PositionedElement extends PropertyChainer {
   position!: Position
+  file!: File
+
+  setFile(f: File) {
+    this.file = f
+  }
 }
 
 
@@ -107,6 +113,11 @@ export class Scope extends Declaration {
     return this
   }
 
+  setFile(f: File) {
+    this.file = f
+    for (var d of this.declarations)
+      d.setFile(f)
+  }
 
 }
 
