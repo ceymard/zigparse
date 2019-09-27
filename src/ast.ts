@@ -41,7 +41,6 @@ const cimport = SeqObj({
   contents: Balanced('(', any, ')')
 })
 .map(() => (from_decl: Declaration) => {
-  console.log('cimport !')
   var f = from_decl.file.host.getCFile()
   return { pubs: false, decl: f ? f.scope : null }
 })
