@@ -7,7 +7,7 @@ export const lexemes = (l: any, start: Lexeme, end: Lexeme, input: Lexeme[]) => 
 
 const doc = Opt(T.BLOCK_COMMENT).map(d => {
   if (!d) return ''
-  return d.str.replace(/^\s*\/\/\/\s*/g, '')
+  return d.str.replace(/^\s*\/\/\/\s*/gm, '')
 })
 const pub = Opt('pub')
 const comptime = Opt('comptime')
@@ -107,6 +107,7 @@ const var_decl: Rule<VariableDeclaration> = Seq(
 // ContainerField <- IDENTIFIER (COLON TypeExpr)? (EQUAL Expr)?
 
 const container_decl: Rule<StructDeclaration | EnumDeclaration | UnionDeclaration> = Seq(
+  doc,
   pub,
   qualifiers,
   ident,
@@ -118,7 +119,8 @@ const container_decl: Rule<StructDeclaration | EnumDeclaration | UnionDeclaratio
     'union'
   ).map(a => a.str),
   decl_scope
-).map(([pub, qual, ident, _1, quals, kind, scope]) => (kind === 'struct' ? new StructDeclaration() : kind === 'union' ? new UnionDeclaration() : new EnumDeclaration())
+).map(([doc, pub, qual, ident, _1, quals, kind, scope]) => (kind === 'struct' ? new StructDeclaration() : kind === 'union' ? new UnionDeclaration() : new EnumDeclaration())
+  .set('doc', doc)
   .set('is_public', !!pub)
   .set('name', ident)
   .appendDeclarations(scope.declarations)

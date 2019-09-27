@@ -140,6 +140,7 @@ export class VariableDeclaration extends Declaration {
   }
 
   getMembers(as_type = false): Declaration[] {
+    console.log(this.name)
     // look first at the type. If we find it, then return its definition.
     var typ = this.parent!.resolveExpression(this.type)
     if (typ) return typ.getMembers(true)
