@@ -30,7 +30,8 @@ export const resolvable_outer_expr = Seq(Opt('try'), Opt(Seq(any, '!')), separat
 
 
 const spaces: {[name: string]: string} = {
-  const: 'const '
+  const: 'const ',
+  extern: 'extern ',
 }
 
 export function reJoin(lex: Lexeme[] | null, prefix = '') {
@@ -167,6 +168,18 @@ export class VariableDeclaration extends Declaration {
     return val.getMembers(as_type)
   }
 
+}
+
+
+export class ErrorIdentifier extends VariableDeclaration { }
+
+
+export class ErrorDeclaration extends VariableDeclaration {
+  lst: ErrorIdentifier[] = []
+
+  getMembers() {
+    return this.lst
+  }
 }
 
 
@@ -311,6 +324,8 @@ export class MemberedContainer extends ContainerDeclaration {
   }
 }
 
+
+export class EnumMember extends VariableDeclaration { }
 
 export class EnumDeclaration extends MemberedContainer {
 

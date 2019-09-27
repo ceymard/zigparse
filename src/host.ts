@@ -106,6 +106,16 @@ export class File {
     return null
   }
 
+  getDeclarationAt(file_pos: number): Declaration | null {
+    const lx = this.lexer.getLexemeAt(file_pos)
+    if (!lx) return null
+    const expr = resolvable_outer_expr.map(lexemes).tryParse(lx.input_position, this.lexer.lexed, -1)
+    if (!expr) return null
+    const scope = this.getScopeAt(file_pos)
+    if (!scope) return null
+    return scope.resolveExpression(expr[1])
+  }
+
   /**
    * Get declarations corresponding to what can complete at a given location.
    *

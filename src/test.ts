@@ -1,5 +1,5 @@
 import * as fs from 'fs'
-import { PositionedElement, Scope, VariableDeclaration, FunctionDeclaration, StructDeclaration, EnumDeclaration, MemberField, Declaration, ContainerDeclaration, FunctionArgumentDeclaration } from './ast'
+import { PositionedElement, Scope, VariableDeclaration, FunctionDeclaration, StructDeclaration, EnumDeclaration, MemberField, Declaration, ContainerDeclaration, FunctionArgumentDeclaration, ErrorDeclaration, EnumMember } from './ast'
 import { Lexer, Lexeme, S, P, any, Either, Opt } from './libparse'
 import c from 'chalk'
 import { ZigHost } from '.'
@@ -79,8 +79,15 @@ function printDeclaration(d: Declaration, indent = '') {
       + '(' + d.args.map(a => c.green(a.name) + ': ' + c.grey(lx(a.type))).join(', ') + ')'
       + c.gray(' -> ' + lx(d.return_type))
     )
+  } else if (d.is(ErrorDeclaration)) {
+    p(c.red.bold(pu(d) + 'error') + ' ' + d.name)
+    indent += '  '
+    for (var e of d.lst)
+      p(c.red(e.name))
+  } else if (d.is(EnumMember)) {
+    p(c.cyan(d.name) + c.gray((d.value ? ' = ' : '') + lx(d.value)))
   } else if (d.is(StructDeclaration)) {
-    p(c.red.bold(pu(d) + 'struct') + ' ' + d.name)
+    p(c.magentaBright.bold(pu(d) + 'struct') + ' ' + d.name)
   } else if (d.is(EnumDeclaration)) {
     p(c.cyan.bold(pu(d) + 'enum') + ' ' + d.name)
   } else if (d.is(MemberField)) {
