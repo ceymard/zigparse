@@ -155,7 +155,7 @@ export class VariableDeclaration extends Declaration {
       var f = this.file.host.getZigFile(this.file.path, import_path)
       if (!f) return []
       this.doc = f.scope.doc // also import its documentation if any
-      return f.scope.getMembers()
+      return f.scope.getMembers().filter(d => d.is_public)
     }
 
     // then try to see if it's a cImport
