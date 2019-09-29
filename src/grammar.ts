@@ -1,8 +1,8 @@
 
-import { SeqObj, Opt, Either, Token, S, ZeroOrMore, Node } from './libparse'
+import { SeqObj, Opt, Either, Token, S, ZeroOrMore, Node, RawRule } from './libparse'
 import { VariableDeclaration, TestDeclaration, Declaration } from './declarations'
 import { Expression, TypeExpression } from './expression'
-import { Block } from './ast'
+import { Block, FileBlock } from './ast'
 
 
 export const T = {
@@ -33,12 +33,21 @@ export const T = {
 }
 
 
-const kw_test = 'test'
+const kw_test =     'test'
 const kw_const =    'const'
 const kw_var =      'var'
 const kw_comptime = 'comptime'
+const kw_use =      'use'
 
-const opt_kw_comptime = Opt(kw_comptime)
+const OptBool = (r: RawRule<any>) => Opt(r).map(r => !!r)
+
+const opt_kw_comptime = OptBool(kw_comptime)
+const opt_kw_extern = OptBool('extern')
+const opt_kw_export = OptBool('export')
+const opt_kw_inline = OptBool('inline')
+const opt_kw_threadlocal = OptBool('threadlocal')
+
+
 const kw_const_var = Either(kw_const, kw_var)
 
 const tk_equal = '='
@@ -84,12 +93,15 @@ export const TYPE_EXPRESSION = SeqObj({})
 
 ////////////////////////////////////////////
 export const VARIABLE_DECLARATION = SeqObj({
-            opt_kw_comptime,
-            kw_const_var,
-  ident:    IDENT,
-  opt_type: S`: ${Opt(EXPRESSION)}`,
-            tk_equal,
-  value:    EXPRESSION,
+              opt_kw_export,
+  opt_extern: Opt(`extern ${STR}`),
+              opt_kw_threadlocal,
+              opt_kw_comptime,
+              kw_const_var,
+  ident:      IDENT,
+  opt_type:   S` : ${Opt(EXPRESSION)}`,
+              tk_equal,
+  value:      EXPRESSION,
 })
 .map(({ident, opt_type, value}) =>
   new VariableDeclaration()
@@ -113,7 +125,6 @@ export const BLOCK = SeqObj({
 .map(({statements}) =>
   new Block()
   .set('statements', statements)
-  .set('declarations', statements.filter(s => s instanceof Declaration) as Declaration[])
 )
 
 
@@ -146,7 +157,30 @@ export const TEST_DECLARATION = SeqObj({
 )
 
 
+/////////////////////////////////////////
+export const TOPLEVEL_COMPTIME = SeqObj({
+            kw_comptime,
+  block:    BLOCK_EXPRESSION,
+})
+.map(b => b.block)
+
+
+/////////////////////////////////////////
+export const FUNCTION_DECLARATION = SeqObj({
+                opt_kw_export,
+  opt_extern:   Opt(S`extern ${STR}`),
+                opt_kw_threadlocal,
+                opt_kw_inline
+})
+
+
 //////////////////////////////////////
 export const ROOT = ZeroOrMore(Either(
-
+  TEST_DECLARATION,
+  TOPLEVEL_COMPTIME,
+  // FUNCTION_DECLARATION,
+  VARIABLE_DECLARATION,
 ))
+.map(statements => new FileBlock()
+  .set('statements', statements)
+)
