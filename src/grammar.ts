@@ -1,7 +1,7 @@
 
-import { SeqObj, Opt, Either, Token, S, ZeroOrMore, Node, RawRule, separated_by, EitherObj } from './libparse'
+import { SeqObj, Opt, Either, Token, S, ZeroOrMore, Node, RawRule, separated_by, EitherObj, Rule, BinOp, second } from './libparse'
 import { VariableDeclaration, TestDeclaration, FunctionArgument } from './declarations'
-import { Expression, TypeExpression } from './expression'
+import { Expression, TypeExpression, BinOpExpression } from './expression'
 import { Block, FileBlock } from './ast'
 
 
@@ -38,6 +38,8 @@ const kw_const =          'const'
 const kw_var =            'var'
 const kw_comptime =       'comptime'
 const kw_usingnamespace = 'usingnamespace'
+const kw_or =             'or'
+const kw_and =            'and'
 
 const OptBool = (r: RawRule<any>) => Opt(r).map(r => !!r)
 
@@ -106,10 +108,99 @@ export const BLOCK_LABEL = SeqObj({
 .map(({name}) => name)
 
 
+
 ////////////////////////////////////
-export const EXPRESSION = SeqObj({})
+
+export const PAYLOAD = SeqObj({
+  _s:         '|',
+  opt_ptr:    OptBool('*'),
+  ident:      IDENT,
+  opt_index:  Opt(SeqObj({
+                _1:       ',',
+                ident:    IDENT,
+              })
+              .map(e => e.ident)),
+  _e:         '|',
+})
+
+
+//////////////////////////////////////
+export const WHILE_PREFIX = SeqObj({})
+
+
+/////////////////////////////////
+export const IF_PREFIX = SeqObj({
+  if:           'if',
+  exp:          () => EXPRESSION,
+  opt_payload:  Opt(PAYLOAD),
+})
+
+
+///////////////////////////////////////////
+export const COMPTIME_EXPRESSION = SeqObj({
+  kw_comptime:      'comptime',
+  exp:              () => EXPRESSION
+})
+.map(e => new Node()) // FIXME !
+
+
+//////////////////////////////////////////
+export const IF_ELSE_EXPRESSION = SeqObj({
+  prefix:       IF_PREFIX,
+  exp:          () => EXPRESSION,
+  opt_else:     SeqObj({
+                  kw_else:      'else',
+                  opt_payload:  Opt(PAYLOAD),
+                  exp:          () => EXPRESSION,
+                })
+})
+.map(i => new Node) // FIXME !
+
+
+/////////////////////////////////////////
+export const PRIMARY_EXPRESSION = Either(
+  IF_ELSE_EXPRESSION,
+  COMPTIME_EXPRESSION
+)
+
+
+/////////////////////////////////////////
+export const PREFIX_EXPRESSION = SeqObj({
+  op:           /\!/,
+  exp:          PRIMARY_EXPRESSION
+})
+.map(e => e.exp)
+
+const BinOp = (op: RawRule<any>, exp: Rule<Expression>) => SeqObj({
+  exp,
+  rest: ZeroOrMore(SeqObj({op, exp}))
+}).map(({exp, rest}) => {
+  var res = exp
+  for (var r of rest) {
+
+  }
+  return res
+})
+
+export const MULTIPLY_EXPRESSION = BinOp(/\*/, PREFIX_EXPRESSION)
+export const ADDITION_EXPRESSION = BinOp(/\+/, MULTIPLY_EXPRESSION)
+export const BITSHIFT_EXPRESSION = BinOp(/<</, ADDITION_EXPRESSION)
+export const BITWISE_EXPRESSION = BinOp(/>>/, BITSHIFT_EXPRESSION)
+export const COMPARE_EXPRESSION = BinOp(/==/, BITWISE_EXPRESSION)
+export const BOOL_AND_EXPRESSION = BinOp('and', COMPARE_EXPRESSION)
+export const BOOL_OR_EXPRESSION = BinOp('or', BOOL_AND_EXPRESSION)
+
+
+////////////////////////////////////
+export const EXPRESSION = SeqObj({
+  maybe_try:      Opt('try'),
+  expression:     BOOL_OR_EXPRESSION,
+})
 .map(() => new Expression())
 
+
+///////////////////////////////////////////////////////
+export const ASSIGN_EXPRESSION = BinOp('=', EXPRESSION)
 
 /////////////////////////////////////////
 export const TYPE_EXPRESSION = SeqObj({})

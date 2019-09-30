@@ -473,6 +473,7 @@ export function ZF<T>(_r: RawRule<T>, until?: RawRule<any> | null): Rule<T[]> {
   })
 }
 
+
 export function first<A>(a: [A, ...any[]]) { return a[0] }
 export function second<A>(a: [any, A, ...any[]]) { return a[1] }
 export function third<A>(a: [any, any, A, ...any[]]) { return a[2] }
