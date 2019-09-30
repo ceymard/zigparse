@@ -309,6 +309,11 @@ export function Either(..._rules: RawRule<any>[]): Rule<any> {
 }
 
 
+export function EitherObj<T extends {[name: string]: RawRule<any>}>(rules: T): Rule<{[K in keyof T]: T[K] | undefined}> {
+
+}
+
+
 export function Peek(r: RawRule<any>) {
   var rule = mkRule(r)
   return new Rule((pos, input) => {

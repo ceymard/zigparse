@@ -1,6 +1,6 @@
 
-import { SeqObj, Opt, Either, Token, S, ZeroOrMore, Node, RawRule } from './libparse'
-import { VariableDeclaration, TestDeclaration, Declaration } from './declarations'
+import { SeqObj, Opt, Either, Token, S, ZeroOrMore, Node, RawRule, separated_by, EitherObj } from './libparse'
+import { VariableDeclaration, TestDeclaration, FunctionArgument } from './declarations'
 import { Expression, TypeExpression } from './expression'
 import { Block, FileBlock } from './ast'
 
@@ -33,39 +33,64 @@ export const T = {
 }
 
 
-const kw_test =     'test'
-const kw_const =    'const'
-const kw_var =      'var'
-const kw_comptime = 'comptime'
-const kw_use =      'use'
+const kw_test =           'test'
+const kw_const =          'const'
+const kw_var =            'var'
+const kw_comptime =       'comptime'
+const kw_usingnamespace = 'usingnamespace'
 
 const OptBool = (r: RawRule<any>) => Opt(r).map(r => !!r)
 
 const opt_kw_comptime = OptBool(kw_comptime)
-const opt_kw_extern = OptBool('extern')
 const opt_kw_export = OptBool('export')
 const opt_kw_inline = OptBool('inline')
 const opt_kw_threadlocal = OptBool('threadlocal')
+const opt_kw_pub = OptBool('pub')
 
 
 const kw_const_var = Either(kw_const, kw_var)
 
 const tk_equal = '='
-const tk_semicolon = ':'
+const tk_semicolon = ';'
+const tk_colon = ':'
 const tk_lbrace = '{'
 const tk_rbrace = '}'
 
 //////////////////////////////////////////////////////////
 
 
+export const DOC = Opt(Token(T.BLOCK_COMMENT).map(t => t.str))
+
+
+///////////////////////////////////
 export const IDENT = Token(T.IDENT)
 .map(id => id.str)
+
+
+///////////////////////////////
+export const VAR = Token('var')
+.map(r =>
+  // FIXME
+  new TypeExpression()
+)
+
+
+////////////////////////////////
+export const DOT3 = Token('...')
+.map(r =>
+  // FIXME
+  new TypeExpression()
+)
 
 
 ///////////////////////////////
 export const STR = Token(T.STR)
 .map(s => s.str.slice(1, -1))
   // FIXME this is incorrect, since a string can be multiline \\
+
+
+////////////////////////////////////////
+const OPT_EXTERN = Opt(S`extern ${STR}`)
 
 
 /////////////////////////////////
@@ -76,7 +101,7 @@ export const CHAR = Token(T.CHAR)
 ///////////////////////////////////
 export const BLOCK_LABEL = SeqObj({
   name:     IDENT,
-            tk_semicolon
+            tk_colon
 })
 .map(({name}) => name)
 
@@ -93,6 +118,7 @@ export const TYPE_EXPRESSION = SeqObj({})
 
 ////////////////////////////////////////////
 export const VARIABLE_DECLARATION = SeqObj({
+  doc:        DOC,
               opt_kw_export,
   opt_extern: Opt(`extern ${STR}`),
               opt_kw_threadlocal,
@@ -108,6 +134,37 @@ export const VARIABLE_DECLARATION = SeqObj({
   .set('name', ident)
   .set('type', opt_type)
   .set('value', value)
+)
+
+
+/////////////////////////////////////////
+export const FUNCTION_ARGUMENT = SeqObj({
+  doc:      DOC,
+            opt_kw_comptime,
+  ident:    IDENT,
+            tk_colon,
+  type:     Either(TYPE_EXPRESSION, DOT3, VAR),
+})
+.map(r =>
+  new FunctionArgument()
+  .set('name', r.ident)
+  .set('type', r.type)
+)
+
+
+/////////////////////////////////////////
+export const FUNCTION_DECLARATION = SeqObj({
+  doc:          DOC,
+                opt_kw_export,
+                OPT_EXTERN,
+                opt_kw_threadlocal,
+                opt_kw_inline,
+  args:         separated_by(',', FUNCTION_ARGUMENT),
+  return_type:  TYPE_EXPRESSION,
+  definition:   EitherObj({tk_semicolon, block: () => BLOCK}),
+})
+.map(res =>
+  new Node()
 )
 
 
@@ -165,19 +222,19 @@ export const TOPLEVEL_COMPTIME = SeqObj({
 .map(b => b.block)
 
 
-/////////////////////////////////////////
-export const FUNCTION_DECLARATION = SeqObj({
-                opt_kw_export,
-  opt_extern:   Opt(S`extern ${STR}`),
-                opt_kw_threadlocal,
-                opt_kw_inline
+//////////////////////////////////////
+export const USINGNAMESPACE = SeqObj({
+          kw_usingnamespace,
+  exp:    EXPRESSION
 })
+.map(n => new Node()) // FIXME !
 
 
 //////////////////////////////////////
 export const ROOT = ZeroOrMore(Either(
   TEST_DECLARATION,
   TOPLEVEL_COMPTIME,
+  USINGNAMESPACE,
   // FUNCTION_DECLARATION,
   VARIABLE_DECLARATION,
 ))
