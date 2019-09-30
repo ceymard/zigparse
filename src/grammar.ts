@@ -1,7 +1,7 @@
 
-import { SeqObj, Opt, Either, Token, S, ZeroOrMore, Node, RawRule, separated_by, EitherObj, Rule, BinOp, second } from './libparse'
+import { SeqObj, Opt, Either, Token, S, ZeroOrMore, Node, RawRule, separated_by, EitherObj, Rule } from './libparse'
 import { VariableDeclaration, TestDeclaration, FunctionArgument } from './declarations'
-import { Expression, TypeExpression, BinOpExpression } from './expression'
+import { Expression, TypeExpression } from './expression'
 import { Block, FileBlock } from './ast'
 
 
