@@ -48,6 +48,7 @@ const opt_kw_export = OptBool('export')
 const opt_kw_inline = OptBool('inline')
 const opt_kw_threadlocal = OptBool('threadlocal')
 const opt_kw_pub = OptBool('pub')
+const opt_kw_fncc = Opt(Either('nakedcc', 'stdcallcc', 'extern', 'async'))
 
 
 const kw_const_var = Either(kw_const, kw_var)
@@ -108,9 +109,34 @@ export const BLOCK_LABEL = SeqObj({
 .map(({name}) => name)
 
 
+////////////////////////////////////////
+export const BREAK_LABEL = S`: ${IDENT}`
 
-////////////////////////////////////
 
+////////////////////////////////////////
+export const BREAK_EXPRESSION = SeqObj({
+  kw_break:       'break',
+  label:          Opt(BREAK_LABEL),
+  exp:            Opt(() => EXPRESSION),
+})
+
+
+///////////////////////////////////////////
+export const CONTINUE_EXPRESSION = SeqObj({
+  kw_continue:    'continue',
+  label:          Opt(BREAK_LABEL),
+})
+
+
+//////////////////////////////////////////////////////////////
+export const RESUME_EXPRESSION = S`resume ${() => EXPRESSION}`
+
+
+///////////////////////////////////////////////////////////////////
+export const RETURN_EXPRESSION = S`return ${Opt(() => EXPRESSION)}`
+
+
+///////////////////////////////
 export const PAYLOAD = SeqObj({
   _s:         '|',
   opt_ptr:    OptBool('*'),
@@ -157,10 +183,32 @@ export const IF_ELSE_EXPRESSION = SeqObj({
 .map(i => new Node) // FIXME !
 
 
+///////////////////////////////////////
+export const LOOP_EXPRESSION = SeqObj({
+  label:          Opt(BLOCK_LABEL),
+  inline:         Opt('inline'),
+  kw:             Either('for', 'while'),
+  _:              '(',
+  loop_exp:       () => EXPRESSION,
+  _2:             ')',
+  opt_payload:    Opt(PAYLOAD),
+  continue_exp:   Opt(S`: ( ${() => ASSIGN_EXPRESSION} )`),
+  body:           () => BLOCK_OR_EXPR,
+  opt_else:       Opt(SeqObj({
+                    kw_else:        'else',
+                    opt_payload:    Opt(PAYLOAD),
+                    statement:      Opt(() => STATEMENT),
+                  })),
+  opt_semi:       Opt(';')
+})
+
+
 /////////////////////////////////////////
 export const PRIMARY_EXPRESSION = Either(
   IF_ELSE_EXPRESSION,
-  COMPTIME_EXPRESSION
+  COMPTIME_EXPRESSION,
+  LOOP_EXPRESSION,
+
 )
 
 
@@ -207,6 +255,17 @@ export const TYPE_EXPRESSION = SeqObj({})
 .map(() => new TypeExpression())
 
 
+////////////////////////////////////////
+export const CONTAINER_FIELD = SeqObj({
+  doc:        DOC,
+              opt_kw_pub,
+  ident:      IDENT,
+  type:       S` : ${Opt(TYPE_EXPRESSION)}`,
+  value:      S` = ${Opt(EXPRESSION)}`,
+  opt_comma:  Opt(',')
+})
+
+
 ////////////////////////////////////////////
 export const VARIABLE_DECLARATION = SeqObj({
   doc:        DOC,
@@ -246,7 +305,7 @@ export const FUNCTION_ARGUMENT = SeqObj({
 /////////////////////////////////////////
 export const FUNCTION_DECLARATION = SeqObj({
   doc:          DOC,
-                opt_kw_export,
+                opt_kw_fncc,
                 OPT_EXTERN,
                 opt_kw_threadlocal,
                 opt_kw_inline,
@@ -259,15 +318,11 @@ export const FUNCTION_DECLARATION = SeqObj({
 )
 
 
-///////////////////////////////////
-export const STATEMENT = SeqObj({})
-.map(() => new Node())
-
-
 /////////////////////////////
 export const BLOCK = SeqObj({
+  opt_label:  Opt(BLOCK_LABEL),
               tk_lbrace,
-  statements: ZeroOrMore(STATEMENT),
+  statements: ZeroOrMore(() => STATEMENT),
               tk_rbrace,
 })
 .map(({statements}) =>
@@ -276,12 +331,12 @@ export const BLOCK = SeqObj({
 )
 
 
-////////////////////////////////////////
-export const BLOCK_EXPRESSION = SeqObj({
-  opt_label:    Opt(BLOCK_LABEL),
-  block:        BLOCK
-})
-.map(r => r.block.set('label', r.opt_label))
+////////////////////////////////////
+export const BLOCK_OR_EXPR = Either(
+  BLOCK,
+  EXPRESSION
+)
+
 
 
 //////////////////////////////////////
@@ -290,6 +345,63 @@ export const COMPTIME_BLOCK = SeqObj({
   block:  BLOCK,
 })
 .map(r => r.block)
+
+
+///////////////////////////////////////
+export const DEFER_STATEMENT = SeqObj({
+  kw:         Either('defer', 'errdefer'),
+  contents:   BLOCK_OR_EXPR,
+})
+
+
+////////////////////////////////////
+export const SWITCH_PRONG = SeqObj({
+  case:       Either(
+                'else',
+                SeqObj({
+                  lst: separated_by(',', SeqObj({
+                    item: SeqObj({
+                      item: EXPRESSION,
+                      opt:  Opt(S`... ${EXPRESSION}`),
+                    })
+                  })),
+                  opt: Opt(',')
+              })
+              ),
+  tk:         '=>',
+  payload:    Opt(PAYLOAD),
+  exp:        EXPRESSION
+})
+.map(n => new Node())
+
+
+/////////////////////////////////////////
+export const SWITCH_EXPRESSION = SeqObj({
+  _1:        'switch',
+  _2:         '(',
+  exp:        EXPRESSION,
+  _3:         ')',
+  _4:         '{',
+  stmts:      separated_by(',', SWITCH_PRONG),
+  _5:         '}',
+})
+.map(n => new Node())
+
+
+////////////////////////////////
+export const STATEMENT: Rule<Node> = SeqObj({
+  stmt: Either(
+    VARIABLE_DECLARATION,
+    COMPTIME_BLOCK,
+    DEFER_STATEMENT,
+    IF_ELSE_EXPRESSION,
+    DEFER_STATEMENT,
+    LOOP_EXPRESSION,
+    SWITCH_EXPRESSION,
+    ASSIGN_EXPRESSION,
+  ),
+  opt_: Opt(';')
+}).map(e => e.stmt)
 
 
 ////////////////////////////////////////
@@ -305,14 +417,6 @@ export const TEST_DECLARATION = SeqObj({
 )
 
 
-/////////////////////////////////////////
-export const TOPLEVEL_COMPTIME = SeqObj({
-            kw_comptime,
-  block:    BLOCK_EXPRESSION,
-})
-.map(b => b.block)
-
-
 //////////////////////////////////////
 export const USINGNAMESPACE = SeqObj({
           kw_usingnamespace,
@@ -324,10 +428,11 @@ export const USINGNAMESPACE = SeqObj({
 //////////////////////////////////////
 export const ROOT = ZeroOrMore(Either(
   TEST_DECLARATION,
-  TOPLEVEL_COMPTIME,
+  COMPTIME_BLOCK,
   USINGNAMESPACE,
-  // FUNCTION_DECLARATION,
+  FUNCTION_DECLARATION,
   VARIABLE_DECLARATION,
+  CONTAINER_FIELD,
 ))
 .map(statements => new FileBlock()
   .set('statements', statements)
