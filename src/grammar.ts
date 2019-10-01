@@ -157,7 +157,7 @@ export const WHILE_PREFIX = SeqObj({})
 /////////////////////////////////
 export const IF_PREFIX = SeqObj({
   if:           'if',
-  exp:          () => EXPRESSION,
+  exp:          () => ASSIGN_EXPRESSION,
   opt_payload:  Opt(PAYLOAD),
 })
 
@@ -165,7 +165,7 @@ export const IF_PREFIX = SeqObj({
 ///////////////////////////////////////////
 export const COMPTIME_EXPRESSION = SeqObj({
   kw_comptime:      'comptime',
-  exp:              () => EXPRESSION
+  exp:              () => ASSIGN_EXPRESSION
 })
 .map(e => new Node()) // FIXME !
 
@@ -173,7 +173,7 @@ export const COMPTIME_EXPRESSION = SeqObj({
 //////////////////////////////////////////
 export const IF_ELSE_EXPRESSION = SeqObj({
   prefix:       IF_PREFIX,
-  exp:          () => EXPRESSION,
+  exp:          () => ASSIGN_EXPRESSION,
   opt_else:     SeqObj({
                   kw_else:      'else',
                   opt_payload:  Opt(PAYLOAD),
@@ -189,7 +189,7 @@ export const LOOP_EXPRESSION = SeqObj({
   inline:         Opt('inline'),
   kw:             Either('for', 'while'),
   _:              '(',
-  loop_exp:       () => EXPRESSION,
+  loop_exp:       () => ASSIGN_EXPRESSION,
   _2:             ')',
   opt_payload:    Opt(PAYLOAD),
   continue_exp:   Opt(S`: ( ${() => ASSIGN_EXPRESSION} )`),
@@ -203,12 +203,39 @@ export const LOOP_EXPRESSION = SeqObj({
 })
 
 
+
+export const FIELD_INIT = SeqObj({
+  _dt:        '.',
+  ident:      IDENT,
+  _eq:        '=',
+  exp:        () => EXPRESSION,
+})
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+export const INIT_LIST = SeqObj({
+  _st:      '{',
+  lst:      Opt(Either(
+              separated_by(',', () => EXPRESSION),
+              separated_by(',', FIELD_INIT)
+            )),
+  _end:     '}'
+})
+.map(r => r.lst)
+
+
+////////
+export const CURLY_SUFFIX_EXPRESSION = SeqObj({
+  type:       () => TYPE_EXPRESSION,
+  lst:        INIT_LIST
+})
+
+
 /////////////////////////////////////////
 export const PRIMARY_EXPRESSION = Either(
   IF_ELSE_EXPRESSION,
   COMPTIME_EXPRESSION,
   LOOP_EXPRESSION,
-
 )
 
 
@@ -249,6 +276,7 @@ export const EXPRESSION = SeqObj({
 
 ///////////////////////////////////////////////////////
 export const ASSIGN_EXPRESSION = BinOp('=', EXPRESSION)
+
 
 /////////////////////////////////////////
 export const TYPE_EXPRESSION = SeqObj({})
@@ -366,7 +394,7 @@ export const SWITCH_PRONG = SeqObj({
                     })
                   })),
                   opt: Opt(',')
-              })
+                })
               ),
   tk:         '=>',
   payload:    Opt(PAYLOAD),
@@ -420,7 +448,8 @@ export const TEST_DECLARATION = SeqObj({
 //////////////////////////////////////
 export const USINGNAMESPACE = SeqObj({
           kw_usingnamespace,
-  exp:    EXPRESSION
+  exp:    EXPRESSION,
+  semi:   Opt(tk_semicolon),
 })
 .map(n => new Node()) // FIXME !
 

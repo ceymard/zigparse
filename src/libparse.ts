@@ -485,7 +485,8 @@ export const separated_by = <T>(separator: RawRule<any>, rule: RawRule<T>) =>
       SeqObj({sep: separator, rule}).map(({rule}) => {
         return rule as T
       })
-    )
+    ),
+    opt_end: Opt(separator)
   }).map(({rule, more}) => [rule, ...more])
 
 
