@@ -38,6 +38,9 @@ const kw_const =          'const'
 const kw_var =            'var'
 const kw_comptime =       'comptime'
 const kw_usingnamespace = 'usingnamespace'
+const kw_volatile =       'volatile'
+const kw_allowzero =      'allowzero'
+const kw_async =          'async'
 const kw_or =             'or'
 const kw_and =            'and'
 
@@ -278,6 +281,56 @@ export const EXPRESSION = SeqObj({
 export const ASSIGN_EXPRESSION = BinOp('=', EXPRESSION)
 
 
+export const PRIMARY_TYPE_EXPRESSION = Either()
+
+
+///
+export const PREFIX_TYPE_OP = EitherObj({
+  optional: '?',
+  promise: S`promise ->`,
+  array_type: S`[ ${EXPRESSION} ] ${ZeroOrMore(Either(S`align ( ${EXPRESSION} )`, 'const', 'volatile', 'allowzero'))}`,
+  pointer: SeqObj({
+    ptrtype: Either('*', '**', '[*]', '[*c]'),
+    modifiers: EitherObj({
+      align:  S`align ( ${EXPRESSION} ${Opt(S`: ${INTEGER} : ${INTEGER}`)} )`,
+              kw_const,
+              kw_volatile,
+              kw_allowzero
+    })
+  })
+})
+
+
+export const SUFFIX_OPERATOR = EitherObj({
+  slice:    SeqObj({
+              _1: '[',
+              exp: EXPRESSION,
+              slice: Opt(S`.. ${EXPRESSION}`),
+              _2: ']'
+            }),
+  dot_identifier: S`. ${IDENT}`,
+  dot_asterisk: S`. *`,
+  dot_question: S`. ?`,
+})
+
+
+
+export const ASYNC_TYPE_EXPRESSION = SeqObj({
+            kw_async,
+  type:     PRIMARY_TYPE_EXPRESSION,
+  suffix:   ZeroOrMore(SUFFIX_OPERATOR),
+  args:     () => FUNCTION_CALL_ARGUMENTS,
+})
+
+
+export const SUFFIX_TYPE_EXPRESSION = Either()
+
+
+export const ERROR_UNION_EXPRESSION = SeqObj({
+
+})
+
+
 /////////////////////////////////////////
 export const TYPE_EXPRESSION = SeqObj({})
 .map(() => new TypeExpression())
@@ -328,6 +381,13 @@ export const FUNCTION_ARGUMENT = SeqObj({
   .set('name', r.ident)
   .set('type', r.type)
 )
+
+
+export const FUNCTION_CALL_ARGUMENTS = SeqObj({
+  _1:           '(',
+  args:         separated_by(',', FUNCTION_ARGUMENT),
+  _2:           ')'
+}).map(r => r.args)
 
 
 /////////////////////////////////////////

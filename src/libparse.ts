@@ -250,6 +250,7 @@ export function S<A extends RawRule<any>, B extends RawRule<any>, C extends RawR
 export function S<A extends RawRule<any>, B extends RawRule<any>, C extends RawRule<any>>(t: TemplateStringsArray, ...rules: [A, B, C]): Rule<[Result<A>, Result<B>, Result<C>]>
 export function S<A extends RawRule<any>, B extends RawRule<any>>(t: TemplateStringsArray, ...rules: [A, B]): Rule<[Result<A>, Result<B>]>
 export function S<A extends RawRule<any>>(t: TemplateStringsArray, rules: A): Rule<Result<A>>
+export function S<A extends RawRule<any>>(t: TemplateStringsArray): Rule<Lexeme[]>
 export function S(tpl: TemplateStringsArray, ...rules: RawRule<any>[]): Rule<any> {
 
   const len = rules.length
