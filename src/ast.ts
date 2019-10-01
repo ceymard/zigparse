@@ -37,3 +37,14 @@ export class FileBlock extends Block {
   // TODO a file should let me find a Node by its position.
 
 }
+
+
+export class Literal extends Node {
+
+}
+
+export class StringLiteral extends Literal { value = '' }
+export class CharLiteral extends Literal { value = '' }
+export class BooleanLiteral extends Literal { value = false }
+export class IntegerLiteral extends Literal { value = 0 }
+export class FloatLiteral extends Literal { value = 0 }

@@ -9,7 +9,10 @@ export const T = {
   BLOCK_COMMENT: /([ \t]*\/\/\/[^\n]*\n)+/m,
   STR: /"(\\"|.)*"|\\\\[^\n]*\n(\s*\\\\[^\n]*\n)*/,
   CHAR: /'(\\'|.)*'/,
-  IDENT: /@?\w+|@"[^"]+"/,
+  BUILTIN_IDENT: /@[A-Za-z_][A-Za-z_0-9]*/,
+  INTEGER: /sss/, // fixme
+  FLOAT: /sss/, // fixme
+  IDENT: /[A-Za-z_]\w*|@"[^"]+"/,
   OP: new RegExp([
     /&=|&/,
     /\*%=|\*%|\*=|\*\*|\*/,
@@ -281,14 +284,53 @@ export const EXPRESSION = SeqObj({
 export const ASSIGN_EXPRESSION = BinOp('=', EXPRESSION)
 
 
-export const PRIMARY_TYPE_EXPRESSION = Either()
+export const LABELED_TYPE_EXPRESSION = Either(
+  SeqObj({lbl: BLOCK_LABEL, blk: () => BLOCK }),
+  LOOP_EXPRESSION
+)
+
+
+export const PRIMARY_TYPE_EXPRESSION: Rule<Expression> = Either(
+  Either(
+    'true',
+    'false',
+    'null',
+    'undefined',
+    'promise',
+    'unreachable',
+  ),
+  Either(
+    T.CHAR,
+    T.FLOAT,
+    T.INTEGER,
+    T.IDENT,
+    T.CHAR,
+    T.STR,
+  ),
+  Either(
+    S`( ${() => PRIMARY_TYPE_EXPRESSION} )`,
+    SeqObj({ident: T.BUILTIN_IDENT, args: () => FUNCTION_CALL_ARGUMENTS}),
+    () => CONTAINER_DECL,
+    S`. ${IDENT}`,
+    S`error . ${IDENT}`,
+    () => SWITCH_EXPRESSION,
+    () => IF_ELSE_EXPRESSION,
+    () => FUNCTION_DECLARATION,
+    LABELED_TYPE_EXPRESSION,
+  ),
+)
 
 
 ///
 export const PREFIX_TYPE_OP = EitherObj({
   optional: '?',
   promise: S`promise ->`,
-  array_type: S`[ ${EXPRESSION} ] ${ZeroOrMore(Either(S`align ( ${EXPRESSION} )`, 'const', 'volatile', 'allowzero'))}`,
+  array_type: SeqObj({
+              _1: '[',
+              exp: EXPRESSION,
+              _2: ']',
+              z: ZeroOrMore(Either(S`align ( ${EXPRESSION} )`, 'const', 'volatile', 'allowzero'))
+            }),
   pointer: SeqObj({
     ptrtype: Either('*', '**', '[*]', '[*c]'),
     modifiers: EitherObj({
@@ -323,16 +365,26 @@ export const ASYNC_TYPE_EXPRESSION = SeqObj({
 })
 
 
-export const SUFFIX_TYPE_EXPRESSION = Either()
+export const SUFFIX_EXPRESSION = Either(
+  ASYNC_TYPE_EXPRESSION,
+  SeqObj({
+    type: PRIMARY_TYPE_EXPRESSION,
+    modifiers: ZeroOrMore(Either(() => FUNCTION_CALL_ARGUMENTS, SUFFIX_OPERATOR))
+  })
+)
 
 
 export const ERROR_UNION_EXPRESSION = SeqObj({
-
+  suffix_exp: SUFFIX_EXPRESSION,
+  opt_type:   Opt(S`! ${() => TYPE_EXPRESSION}`),
 })
 
 
 /////////////////////////////////////////
-export const TYPE_EXPRESSION = SeqObj({})
+export const TYPE_EXPRESSION: Rule<TypeExpression> = SeqObj({
+  prefix: ZeroOrMore(PREFIX_TYPE_OP),
+  error_union_expr: ERROR_UNION_EXPRESSION
+})
 .map(() => new TypeExpression())
 
 
@@ -351,7 +403,7 @@ export const CONTAINER_FIELD = SeqObj({
 export const VARIABLE_DECLARATION = SeqObj({
   doc:        DOC,
               opt_kw_export,
-  opt_extern: Opt(`extern ${STR}`),
+  opt_extern: Opt(S`extern ${STR}`),
               opt_kw_threadlocal,
               opt_kw_comptime,
               kw_const_var,
@@ -515,7 +567,21 @@ export const USINGNAMESPACE = SeqObj({
 
 
 //////////////////////////////////////
-export const ROOT = ZeroOrMore(Either(
+export const CONTAINER_DECL = SeqObj({
+  opt_extern:       Opt('extern'),
+  opt_packed:       Opt('packed'),
+  kind: Either(
+    SeqObj({ kind: Either('enum', 'struct') }),
+    SeqObj({ kind: 'union', opt: S`( ${S`  `} )` }) // FIXME !!!
+  ),
+  _1: '{',
+  members: () => CONTAINER_MEMBERS,
+  _2: '}',
+})
+
+
+//////////////////////////////////////
+export const CONTAINER_MEMBERS = ZeroOrMore(Either(
   TEST_DECLARATION,
   COMPTIME_BLOCK,
   USINGNAMESPACE,
@@ -523,6 +589,9 @@ export const ROOT = ZeroOrMore(Either(
   VARIABLE_DECLARATION,
   CONTAINER_FIELD,
 ))
+
+
+export const ROOT = CONTAINER_MEMBERS
 .map(statements => new FileBlock()
   .set('statements', statements)
 )
