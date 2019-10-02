@@ -437,7 +437,7 @@ export const FUNCTION_ARGUMENT = SeqObj({
 
 export const FUNCTION_CALL_ARGUMENTS = SeqObj({
   _1:           '(',
-  args:         separated_by(',', FUNCTION_ARGUMENT),
+  args:         separated_by(',', EXPRESSION),
   _2:           ')'
 }).map(r => r.args)
 
