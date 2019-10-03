@@ -2,7 +2,7 @@
 import { SeqObj, Opt, Either, Token, S, ZeroOrMore, Node, RawRule, separated_by, EitherObj, Rule } from './libparse'
 import { VariableDeclaration, TestDeclaration, FunctionArgument } from './declarations'
 import { Expression, TypeExpression } from './expression'
-import { Block, FileBlock } from './ast'
+import * as a from './ast'
 
 
 export const T = {
@@ -292,27 +292,28 @@ export const LABELED_TYPE_EXPRESSION = Either(
 
 export const PRIMARY_TYPE_EXPRESSION: Rule<Expression> = Either(
   Either(
-    'true',
-    'false',
-    'null',
-    'undefined',
-    'promise',
-    'unreachable',
+    Token('true').map(() => new a.True),
+    Token('false').map(() => new a.False),
+    Token('null').map(() => new a.Null),
+    Token('undefined').map(() => new a.Undefined),
+    Token('promise').map(() => new a.Promise),
+    Token('unreachable').map(() => new a.Unreachable),
   ),
   Either(
-    T.CHAR,
-    T.FLOAT,
-    T.INTEGER,
-    T.IDENT,
-    T.CHAR,
-    T.STR,
+    Token(T.IDENT).map(n => new a.Identifier().set('value', n.str)),
+    Token(T.CHAR).map(n => new a.CharLiteral().set('value', n.str)),
+    Token(T.FLOAT).map(n => new a.FloatLiteral().set('value', n.str)),
+    Token(T.INTEGER).map(n => new a.IntegerLiteral().set('value', n.str)),
+    Token(T.CHAR).map(n => new a.CharLiteral().set('value', n.str)),
+    Token(T.STR).map(n => new a.StringLiteral().set('value', n.str)),
   ),
   Either(
+    // parenthesized expression
     S`( ${() => PRIMARY_TYPE_EXPRESSION} )`,
     SeqObj({ident: T.BUILTIN_IDENT, args: () => FUNCTION_CALL_ARGUMENTS}),
     () => CONTAINER_DECL,
-    S`. ${IDENT}`,
-    S`error . ${IDENT}`,
+    S`. ${IDENT}`.map(n => new a.LeadingDotAccess().set('name', n)),
+    S`error . ${IDENT}`.map(n => new a.ErrorField().set('name', n)),
     () => SWITCH_EXPRESSION,
     () => IF_ELSE_EXPRESSION,
     () => FUNCTION_DECLARATION,

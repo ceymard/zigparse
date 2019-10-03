@@ -1,8 +1,23 @@
-import { Declaration } from "./declarations"
+
 import { Node } from "./libparse"
 
 
-export class Block extends Node {
+export class Declaration extends Node {
+  pub = false
+  comptime = false
+  extern = false
+  name = ''
+  type!: Expression | null
+  value!: Expression | null // when used with extern, there may not be a value
+}
+
+
+export class Expression extends Node {
+
+}
+
+
+export class Block extends Expression {
 
   parent_block: Block | null = null
   label: string | null = null
@@ -22,7 +37,7 @@ export class Block extends Node {
 }
 
 
-export class ComptimeBlock extends Block {
+export class ComptimeBlock extends Expression {
 
 }
 
@@ -30,7 +45,7 @@ export class ComptimeBlock extends Block {
 /**
  *
  */
-export class FileBlock extends Block {
+export class FileBlock extends Expression {
 
   path: string = ''
 
@@ -38,13 +53,66 @@ export class FileBlock extends Block {
 
 }
 
-
-export class Literal extends Node {
-
+export class LeadingDotAccess extends Expression {
+  name = ''
 }
 
-export class StringLiteral extends Literal { value = '' }
-export class CharLiteral extends Literal { value = '' }
-export class BooleanLiteral extends Literal { value = false }
-export class IntegerLiteral extends Literal { value = 0 }
-export class FloatLiteral extends Literal { value = 0 }
+
+export class ErrorField extends Expression {
+  name = ''
+}
+
+export class ErrorUnion extends Expression {
+  fields = [] as ErrorField[]
+}
+
+
+export class Undefined extends Expression { }
+export class Null extends Expression { }
+export class Promise extends Expression { }
+export class Unreachable extends Expression { }
+export class True extends Expression { }
+export class False extends Expression { }
+
+
+export class Literal extends Expression {
+  value = ''
+}
+
+export class Identifier extends Literal { }
+export class StringLiteral extends Literal { }
+export class CharLiteral extends Literal { }
+export class BooleanLiteral extends Literal { }
+export class IntegerLiteral extends Literal { }
+export class FloatLiteral extends Literal { }
+
+export class BuiltinFunctionCall extends Expression {
+  name = ''
+  args = [] as Expression[]
+}
+
+////////////////////////////////////////////////////////
+
+export class FunctionArgumentDefinition extends Expression {
+  comptime = false
+  name = ''
+  type!: Expression
+}
+
+
+export class FunctionDefinition extends Expression {
+  pub = false
+  extern = false
+  name: string | null = null
+  args = [] as FunctionArgumentDefinition[]
+  return_type!: Expression
+}
+
+
+export class VariableDeclaration extends Expression {
+  pub = false
+  extern = false
+  name = ''
+  type: Expression | null = null
+  value: Expression | null = null
+}

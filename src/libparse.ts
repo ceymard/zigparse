@@ -497,8 +497,8 @@ export class Position {
 
 export class Node {
 
-  parent: Node | null = null
-  children: Node[] = []
+  protected parent: Node | null = null
+  protected children: Node[] = []
 
   /**
    * Range expressed in offset
