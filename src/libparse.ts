@@ -581,6 +581,11 @@ export class Node {
    * @param t The kind of node we're looking for
    */
   queryParent<T extends {new(...a: any[]): Node}>(t: T): InstanceType<T> | null {
-
+    if (this.parent) {
+      if (this.parent.constructor === t)
+        return this.parent as any
+      return this.parent.queryParent(t)
+    }
+    return null
   }
 }
