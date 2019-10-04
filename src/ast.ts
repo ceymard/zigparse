@@ -63,16 +63,6 @@ export class Block extends Expression {
 }
 
 
-/**
- *
- */
-export class FileBlock extends Expression {
-
-  path: string = ''
-
-  // TODO a file should let me find a Node by its position.
-
-}
 
 export class LeadingDotAccess extends Expression {
   name = ''
@@ -142,7 +132,7 @@ export class FunctionDefinition extends Expression {
 }
 
 
-export class VariableDeclaration extends Expression {
+export class VariableDeclaration extends Declaration {
   pub = false
   extern = false
   name = ''
@@ -155,21 +145,22 @@ export class ContainerDeclaration extends Expression {
   extern = false
   packed = false
 
+  statements: Node[] = []
   members: Declaration[] = []
 }
 
 
-export class EnumDeclaration extends Expression {
+export class EnumDeclaration extends ContainerDeclaration {
   opt_type = null as Expression | null
 }
 
 
-export class StructDeclaration extends Expression {
+export class StructDeclaration extends ContainerDeclaration {
 
 }
 
 
-export class UnionDeclaration extends Expression {
+export class UnionDeclaration extends ContainerDeclaration {
   opt_enum = null as Expression | null
 }
 
@@ -204,4 +195,15 @@ export class Reference extends Expression {
 export class ArrayOrSliceDeclaration extends Expression {
   number: Opt<Expression> // if _ then infer the nember of members, otherwise it is provided.
   type!: Expression
+}
+
+/**
+ *
+ */
+export class FileBlock extends StructDeclaration {
+
+  path: string = ''
+
+  // TODO a file should let me find a Node by its position.
+
 }

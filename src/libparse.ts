@@ -150,14 +150,27 @@ export class Rule<T> {
 
   }
 
-  get d() {
-    return this.map(a => {
-      console.log('!')
+  _tap = false
+
+  get tap(): this {
+    var c = this.clone()
+    c._tap = true
+    return c as any
+  }
+
+  clone() {
+    return new Rule(this._parse, this._maps)
+  }
+
+  get debug() {
+    return this.map((a, st, end, input) => {
+      console.log(a, st.input_position)
       return a
     })
   }
 
   tryParse(pos: number, input: Lexeme[]): ParseResult<T> {
+    if (this._tap) console.log(pos, input.slice(pos, pos + 5).map(e => e.str))
     var res = this._parse(pos, input)
     if (res != null) {
       // if (res[0] === pos) throw new Error('what')

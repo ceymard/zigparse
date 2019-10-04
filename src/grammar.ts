@@ -1,15 +1,14 @@
 
-import { SeqObj, Opt, Either, Token, S, ZeroOrMore, Node, RawRule, separated_by, EitherObj, Rule, Options, any } from './libparse'
-import { VariableDeclaration, TestDeclaration, FunctionArgument } from './declarations'
+import { SeqObj, Opt, Either, Token, S, ZeroOrMore, Node, RawRule, separated_by, EitherObj, Rule, Options, any, Lexeme } from './libparse'
 import { Expression, TypeExpression } from './expression'
 import * as a from './ast'
 
 
 export const T = {
-  BLOCK_COMMENT: /([ \t]*\/\/\/[^\n]*\n)+/m,
-  STR: /"(\\"|.)*"|\\\\[^\n]*\n(\s*\\\\[^\n]*\n)*/,
-  CHAR: /'(\\'|.)*'/,
   BUILTIN_IDENT: /@[A-Za-z_][A-Za-z_0-9]*/,
+  BLOCK_COMMENT: /([ \t]*\/\/\/[^\n]*\n)+/m,
+  STR: /c?"(\\"|.)*"|\\\\[^\n]*\n(\s*\\\\[^\n]*\n)*/,
+  CHAR: /'(\\'|.)*'/,
   FLOAT: /\d+.\d+/, // fixme
   INTEGER: /\d+/, // fixme
   IDENT: /[A-Za-z_]\w*|@"[^"]+"/,
@@ -227,9 +226,9 @@ export const INIT_LIST = SeqObj({
   _st:      '{',
   lst:      Opt(Either(
               separated_by(',', () => EXPRESSION),
-              separated_by(',', FIELD_INIT)
+              separated_by(',', FIELD_INIT),
             )),
-  _end:     '}'
+  _end:     '}',
 })
 .map(r => r.lst)
 
@@ -237,8 +236,8 @@ export const INIT_LIST = SeqObj({
 ////////
 export const CURLY_SUFFIX_EXPRESSION = SeqObj({
   type:       () => TYPE_EXPRESSION,
-  lst:        INIT_LIST
-})
+  lst:        Opt(INIT_LIST)
+}).map(e => e.type)
 
 
 /////////////////////////////////////////
@@ -252,7 +251,7 @@ export const PRIMARY_EXPRESSION = Either(
 
 /////////////////////////////////////////
 export const PREFIX_EXPRESSION = SeqObj({
-  op:           /\!/,
+  op:           Opt(/\!/),
   exp:          PRIMARY_EXPRESSION
 })
 .map(e => e.exp)
@@ -285,6 +284,7 @@ export const EXPRESSION = SeqObj({
 .map(r => r.maybe_try ? new a.TryExpression().set('exp', r.expression) : r.expression)
 
 
+
 ///////////////////////////////////////////////////////
 export const ASSIGN_EXPRESSION = BinOp('=', EXPRESSION)
 
@@ -312,8 +312,8 @@ export const PRIMARY_TYPE_EXPRESSION: Rule<Expression> = Either(
   S`( ${() => PRIMARY_TYPE_EXPRESSION} )`,
   // function call
   SeqObj({
-    ident:    T.BUILTIN_IDENT,
-    args:     () => FUNCTION_CALL_ARGUMENTS
+    ident:    Token(T.BUILTIN_IDENT),
+    args:     () => FUNCTION_CALL_ARGUMENTS,
   }).map(r => new a.BuiltinFunctionCall().set('name', r.ident.str).set('args', r.args)),
   // container
   () => CONTAINER_DECL,
@@ -379,8 +379,11 @@ export const SUFFIX_EXPRESSION = Either(
   ASYNC_TYPE_EXPRESSION,
   SeqObj({
     type: PRIMARY_TYPE_EXPRESSION,
-    modifiers: ZeroOrMore(Either(() => FUNCTION_CALL_ARGUMENTS, SUFFIX_OPERATOR))
-  })
+    modifiers: Options({
+      args: () => FUNCTION_CALL_ARGUMENTS,
+      suf: SUFFIX_OPERATOR
+    })
+  }).map(e => e.type)
 )
 
 
@@ -388,6 +391,7 @@ export const ERROR_UNION_EXPRESSION = SeqObj({
   suffix_exp: SUFFIX_EXPRESSION,
   opt_type:   Opt(S`! ${() => TYPE_EXPRESSION}`),
 })
+.map(e => e.suffix_exp)
 
 
 /////////////////////////////////////////
@@ -395,7 +399,7 @@ export const TYPE_EXPRESSION: Rule<TypeExpression> = SeqObj({
   prefix: ZeroOrMore(PREFIX_TYPE_OP),
   error_union_expr: ERROR_UNION_EXPRESSION
 })
-.map(() => new TypeExpression())
+.map(r => r.error_union_expr)
 
 
 ////////////////////////////////////////
@@ -418,12 +422,12 @@ export const VARIABLE_DECLARATION = SeqObj({
               opt_kw_comptime,
               kw_const_var,
   ident:      IDENT,
-  opt_type:   S` : ${Opt(EXPRESSION)}`,
-              tk_equal,
+  opt_type:   Opt(S` : ${Opt(EXPRESSION)}`),
+  eq:         Token(tk_equal),
   value:      EXPRESSION,
 })
 .map(({ident, opt_type, value}) =>
-  new VariableDeclaration()
+  new a.VariableDeclaration()
   .set('name', ident)
   .set('type', opt_type)
   .set('value', value)
@@ -439,9 +443,7 @@ export const FUNCTION_ARGUMENT = SeqObj({
   type:     Either(TYPE_EXPRESSION, DOT3, VAR),
 })
 .map(r =>
-  new FunctionArgument()
-  .set('name', r.ident)
-  .set('type', r.type)
+  new Node()
 )
 
 
@@ -593,14 +595,14 @@ export const CONTAINER_DECL = SeqObj({
 
 //////////////////////////////////////
 export const CONTAINER_MEMBERS: Rule<a.Declaration[]> = ZeroOrMore(Either(
+  VARIABLE_DECLARATION,
   TEST_DECLARATION,
   COMPTIME_BLOCK,
   USINGNAMESPACE,
   FUNCTION_DECLARATION,
-  VARIABLE_DECLARATION,
   CONTAINER_FIELD,
-  any // will advance if we can't recognize an expression, so that the parser doesn't choke on invalid declarations.
-)).map(res => res.filter(r => r instanceof a.Declaration))
+  any, // will advance if we can't recognize an expression, so that the parser doesn't choke on invalid declarations.
+)).map(res => res.filter(r => !(r instanceof Lexeme)))
 
 
 export const ROOT = CONTAINER_MEMBERS
