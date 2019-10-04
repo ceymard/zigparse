@@ -2,27 +2,49 @@
 import { Node } from "./libparse"
 
 
+export type Opt<T> = T | null | undefined
+
+
 export class Declaration extends Node {
   pub = false
   comptime = false
   extern = false
   name = ''
-  type!: Expression | null
-  value!: Expression | null // when used with extern, there may not be a value
+  type: Opt<Expression>
+  value: Opt<Expression> // when used with extern, there may not be a value
 }
 
 
 export class Expression extends Node {
 
+  getValue(): Expression | null {
+    return null
+  }
+
+  getOriginalDeclaration() {
+
+  }
+
+  getType(): Expression | null {
+    return null
+  }
 }
 
 
+/**
+ *
+ */
 export class Block extends Expression {
 
-  parent_block: Block | null = null
-  label: string | null = null
+  parent_block: Opt<Block>
+  label: Opt<string>
+
   declarations: {[name: string]: Declaration} = {}
   statements: Node[] = []
+  import_namespaces: UsingNamespace[] = []
+
+  // used when the block is asked what type it is...
+  breaks: Expression[] = []
 
   onParsed() {
     // find the closest scope and add this scope to it.
@@ -66,6 +88,9 @@ export class ErrorUnion extends Expression {
   fields = [] as ErrorField[]
 }
 
+export class TryExpression extends Expression {
+  exp!: Expression
+}
 
 export class Undefined extends Expression { }
 export class Null extends Expression { }
@@ -86,6 +111,16 @@ export class BooleanLiteral extends Literal { }
 export class IntegerLiteral extends Literal { }
 export class FloatLiteral extends Literal { }
 
+export class PrimitiveType extends Expression {
+  name = ''
+}
+
+export class FunctionCall extends Expression {
+  name = ''
+  args = [] as Expression[]
+}
+
+
 export class BuiltinFunctionCall extends Expression {
   name = ''
   args = [] as Expression[]
@@ -103,9 +138,8 @@ export class FunctionArgumentDefinition extends Expression {
 export class FunctionDefinition extends Expression {
   pub = false
   extern = false
-  name: string | null = null
   args = [] as FunctionArgumentDefinition[]
-  return_type!: Expression
+  return_type: Opt<Expression>
 }
 
 
@@ -113,6 +147,62 @@ export class VariableDeclaration extends Expression {
   pub = false
   extern = false
   name = ''
-  type: Expression | null = null
-  value: Expression | null = null
+  type: Opt<Expression>
+  value: Opt<Expression>
+}
+
+
+export class ContainerDeclaration extends Expression {
+  extern = false
+  packed = false
+
+  members: Declaration[] = []
+}
+
+
+export class EnumDeclaration extends Expression {
+  opt_type = null as Expression | null
+}
+
+
+export class StructDeclaration extends Expression {
+
+}
+
+
+export class UnionDeclaration extends Expression {
+  opt_enum = null as Expression | null
+}
+
+
+export class UsingNamespace extends Expression {
+
+  exp!: Expression
+
+  onParsed() {
+    // get the closest scope and tell it it should import us.
+    const block = this.queryParent(Block)
+    if (!block) return
+    block.import_namespaces.push(this)
+  }
+
+}
+
+
+export class Optional extends Expression {
+  ref!: Expression
+}
+
+export class Pointer extends Expression {
+  ref!: Expression
+}
+
+export class Reference extends Expression {
+  ref!: Expression
+}
+
+// ????
+export class ArrayOrSliceDeclaration extends Expression {
+  number: Opt<Expression> // if _ then infer the nember of members, otherwise it is provided.
+  type!: Expression
 }

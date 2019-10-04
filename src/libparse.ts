@@ -204,9 +204,12 @@ export function mkRules<R extends RawRule<any>[]>(rules: R): GenericRule<R> {
 
 
 export function Token(r: RegExp | string) {
+  const re_test = r instanceof RegExp ? new RegExp(
+    (r.source[0] !== '^' ? '^' : '') + r.source + (r.source[r.source.length - 1] !== '$' ? '$' : '')
+     , r.flags) : null
   return new Rule((pos, input) => {
     var lexeme = input[pos]
-    if (lexeme && lexeme.is(r)) {
+    if (lexeme && lexeme.is(r) || re_test && lexeme.str.match(re_test)) {
       return [pos + 1, lexeme]
     }
     return null
@@ -268,21 +271,7 @@ export function S(tpl: TemplateStringsArray, ...rules: RawRule<any>[]): Rule<any
 
 export type Result<T> = T extends Rule<infer U> ? U : T extends () => Rule<infer V> ? V : Lexeme
 
-export function Either<A extends RawRule<any>, B extends RawRule<any>, C extends RawRule<any>, D extends RawRule<any>, E extends RawRule<any>, F extends RawRule<any>, G extends RawRule<any>, H extends RawRule<any>, I extends RawRule<any>>(a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H, i: I): Rule<Result<A> | Result<B> | Result<C> | Result<D> | Result<E> | Result<F> | Result<G> | Result<H> | Result<I>>
-export function Either<A extends RawRule<any>, B extends RawRule<any>, C extends RawRule<any>, D extends RawRule<any>, E extends RawRule<any>, F extends RawRule<any>, G extends RawRule<any>, H extends RawRule<any>, I extends RawRule<any>>(a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H, i: I): Rule<Result<A> | Result<B> | Result<C> | Result<D> | Result<E> | Result<F> | Result<G> | Result<H> | Result<I>>
-export function Either<A extends RawRule<any>, B extends RawRule<any>, C extends RawRule<any>, D extends RawRule<any>, E extends RawRule<any>, F extends RawRule<any>, G extends RawRule<any>, H extends RawRule<any>, I extends RawRule<any>>(a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H, i: I): Rule<Result<A> | Result<B> | Result<C> | Result<D> | Result<E> | Result<F> | Result<G> | Result<H> | Result<I>>
-export function Either<A extends RawRule<any>, B extends RawRule<any>, C extends RawRule<any>, D extends RawRule<any>, E extends RawRule<any>, F extends RawRule<any>, G extends RawRule<any>, H extends RawRule<any>, I extends RawRule<any>>(a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H, i: I): Rule<Result<A> | Result<B> | Result<C> | Result<D> | Result<E> | Result<F> | Result<G> | Result<H> | Result<I>>
-export function Either<A extends RawRule<any>, B extends RawRule<any>, C extends RawRule<any>, D extends RawRule<any>, E extends RawRule<any>, F extends RawRule<any>, G extends RawRule<any>, H extends RawRule<any>, I extends RawRule<any>>(a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H, i: I): Rule<Result<A> | Result<B> | Result<C> | Result<D> | Result<E> | Result<F> | Result<G> | Result<H> | Result<I>>
-export function Either<A extends RawRule<any>, B extends RawRule<any>, C extends RawRule<any>, D extends RawRule<any>, E extends RawRule<any>, F extends RawRule<any>, G extends RawRule<any>, H extends RawRule<any>, I extends RawRule<any>>(a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H, i: I): Rule<Result<A> | Result<B> | Result<C> | Result<D> | Result<E> | Result<F> | Result<G> | Result<H> | Result<I>>
-export function Either<A extends RawRule<any>, B extends RawRule<any>, C extends RawRule<any>, D extends RawRule<any>, E extends RawRule<any>, F extends RawRule<any>, G extends RawRule<any>, H extends RawRule<any>>(a: A, b: B, c: C, d: D, e: E, f: F, g: G, h: H): Rule<Result<A> | Result<B> | Result<C> | Result<D> | Result<E> | Result<F> | Result<G> | Result<H>>
-export function Either<A extends RawRule<any>, B extends RawRule<any>, C extends RawRule<any>, D extends RawRule<any>, E extends RawRule<any>, F extends RawRule<any>, G extends RawRule<any>>(a: A, b: B, c: C, d: D, e: E, f: F, g: G): Rule<Result<A> | Result<B> | Result<C> | Result<D> | Result<E> | Result<F> | Result<G>>
-export function Either<A extends RawRule<any>, B extends RawRule<any>, C extends RawRule<any>, D extends RawRule<any>, E extends RawRule<any>, F extends RawRule<any>>(a: A, b: B, c: C, d: D, e: E, f: F): Rule<Result<A> | Result<B> | Result<C> | Result<D> | Result<E> | Result<F>>
-export function Either<A extends RawRule<any>, B extends RawRule<any>, C extends RawRule<any>, D extends RawRule<any>, E extends RawRule<any>>(a: A, b: B, c: C, d: D, e: E): Rule<Result<A> | Result<B> | Result<C> | Result<D> | Result<E>>
-export function Either<A extends RawRule<any>, B extends RawRule<any>, C extends RawRule<any>, D extends RawRule<any>>(a: A, b: B, c: C, d: D): Rule<Result<A> | Result<B> | Result<C> | Result<D>>
-export function Either<A extends RawRule<any>, B extends RawRule<any>, C extends RawRule<any>>(a: A, b: B, c: C): Rule<Result<A> | Result<B> | Result<C>>
-export function Either<A extends RawRule<any>, B extends RawRule<any>>(a: A, b: B): Rule<Result<A> | Result<B>>
-
-export function Either(..._rules: RawRule<any>[]): Rule<any> {
+export function Either<T extends RawRule<any>[]>(..._rules: T): Rule<{[K in keyof T]: Result<T[K]>}[number]> {
   var rules = mkRules(_rules)
   return new Rule((pos, input) => {
     var p: ParseResult<any>
@@ -297,9 +286,56 @@ export function Either(..._rules: RawRule<any>[]): Rule<any> {
 }
 
 
-export function EitherObj<T extends {[name: string]: RawRule<any>}>(rules: T): Rule<{[K in keyof T]: T[K] | undefined}> {
-
+/**
+ *
+ */
+export function EitherObj<T extends {[name: string]: RawRule<any>}>(_rules: T): Rule<{[K in keyof T]?: Result<T[K]>} & {result: Result<T[string]>}> {
+  var rules = mkRules(Object.values(_rules))
+  var keys = Object.keys(_rules)
+  var len = keys.length
+  return new Rule((pos, input) => {
+    var res = {} as any
+    var p: ParseResult<any>
+    for (var i = 0; i < len; i++) {
+      var rule = rules[i]
+      if (p = rule.tryParse(pos, input)) {
+        res.result = p[1]
+        res[keys[i]] = p[1]
+        return [p[0], res]
+      }
+    }
+    // not found
+    return null
+  }) as any
 }
+
+
+/**
+ *
+ */
+export function Options<T extends {[name: string]: RawRule<any>}>(_rules: T): Rule<{[K in keyof T]?: Result<T[K]>}> {
+  var rules = mkRules(Object.values(_rules))
+  var keys = Object.keys(_rules)
+  var len = keys.length
+  return new Rule((pos, input) => {
+    var res = {} as any
+    var p: ParseResult<any>
+    while (true) {
+      for (var i = 0; i < len; i++) {
+        var rule = rules[i]
+        if (p = rule.tryParse(pos, input)) {
+          res[keys[i]] = p[1]
+          pos = p[0]
+          continue
+        }
+      }
+      break
+    }
+    // return what we got.
+    return [pos, res]
+  }) as any
+}
+
 
 
 export function Peek(r: RawRule<any>) {

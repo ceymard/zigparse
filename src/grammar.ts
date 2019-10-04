@@ -1,5 +1,5 @@
 
-import { SeqObj, Opt, Either, Token, S, ZeroOrMore, Node, RawRule, separated_by, EitherObj, Rule } from './libparse'
+import { SeqObj, Opt, Either, Token, S, ZeroOrMore, Node, RawRule, separated_by, EitherObj, Rule, Options, any } from './libparse'
 import { VariableDeclaration, TestDeclaration, FunctionArgument } from './declarations'
 import { Expression, TypeExpression } from './expression'
 import * as a from './ast'
@@ -36,6 +36,8 @@ export const T = {
 }
 
 
+const kw_extern =         'extern'
+const kw_packed =         'packed'
 const kw_test =           'test'
 const kw_const =          'const'
 const kw_var =            'var'
@@ -46,6 +48,9 @@ const kw_allowzero =      'allowzero'
 const kw_async =          'async'
 const kw_or =             'or'
 const kw_and =            'and'
+const kw_enum =           'enum'
+const kw_struct =         'struct'
+const kw_union =          'union'
 
 const OptBool = (r: RawRule<any>) => Opt(r).map(r => !!r)
 
@@ -277,7 +282,7 @@ export const EXPRESSION = SeqObj({
   maybe_try:      Opt('try'),
   expression:     BOOL_OR_EXPRESSION,
 })
-.map(() => new Expression())
+.map(r => r.maybe_try ? new a.TryExpression().set('exp', r.expression) : r.expression)
 
 
 ///////////////////////////////////////////////////////
@@ -291,6 +296,12 @@ export const LABELED_TYPE_EXPRESSION = Either(
 
 
 export const PRIMARY_TYPE_EXPRESSION: Rule<Expression> = Either(
+  // Primitive types !
+  Either(
+    Token(/[uif]\d+/),
+    Token(/c_(u?short|u?int|u?long(long)?|longdouble|void)/),
+    Token(/bool|void|noreturn|type|anyerror|comptime_(int|float)/),
+  ).map(r => new a.PrimitiveType().set('name', r.str)),
   Either(
     Token('true').map(() => new a.True),
     Token('false').map(() => new a.False),
@@ -310,9 +321,16 @@ export const PRIMARY_TYPE_EXPRESSION: Rule<Expression> = Either(
   Either(
     // parenthesized expression
     S`( ${() => PRIMARY_TYPE_EXPRESSION} )`,
-    SeqObj({ident: T.BUILTIN_IDENT, args: () => FUNCTION_CALL_ARGUMENTS}),
+    // function call
+    SeqObj({
+      ident:    T.BUILTIN_IDENT,
+      args:     () => FUNCTION_CALL_ARGUMENTS
+    }).map(r => new a.BuiltinFunctionCall().set('name', r.ident.str).set('args', r.args)),
+    // container
     () => CONTAINER_DECL,
+    // dot identifier, used in enums mostly.
     S`. ${IDENT}`.map(n => new a.LeadingDotAccess().set('name', n)),
+    // error
     S`error . ${IDENT}`.map(n => new a.ErrorField().set('name', n)),
     () => SWITCH_EXPRESSION,
     () => IF_ELSE_EXPRESSION,
@@ -467,7 +485,7 @@ export const BLOCK = SeqObj({
               tk_rbrace,
 })
 .map(({statements}) =>
-  new Block()
+  new a.Block()
   .set('statements', statements)
 )
 
@@ -564,35 +582,48 @@ export const USINGNAMESPACE = SeqObj({
   exp:    EXPRESSION,
   semi:   Opt(tk_semicolon),
 })
-.map(n => new Node()) // FIXME !
+.map(n => new a.UsingNamespace().set('exp', n.exp)) // FIXME !
 
 
 //////////////////////////////////////
 export const CONTAINER_DECL = SeqObj({
-  opt_extern:       Opt('extern'),
-  opt_packed:       Opt('packed'),
+  qualifiers:       Options({kw_extern, kw_packed}),
   kind: Either(
-    SeqObj({ kind: Either('enum', 'struct') }),
-    SeqObj({ kind: 'union', opt: S`( ${S`  `} )` }) // FIXME !!!
+    SeqObj({
+            kw_enum,
+            opt_type: Opt(S`( ${EXPRESSION} )`)
+    }).map(r => new a.EnumDeclaration().set('opt_type', r.opt_type)),
+    SeqObj({
+            kw_struct
+    }).map(r => new a.StructDeclaration()),
+    SeqObj({
+            kw_union,
+            opt_enum: Opt(S`( ${EXPRESSION} )`) // missing union (enum) FIXME
+    }).map(r => new a.UnionDeclaration().set('opt_enum', r.opt_enum))
   ),
   _1: '{',
   members: () => CONTAINER_MEMBERS,
   _2: '}',
-})
+}).map(r => (r.kind as a.ContainerDeclaration)
+  .set('members', r.members)
+  .set('packed', !!r.qualifiers.kw_packed)
+  .set('extern', !!r.qualifiers.kw_extern)
+)
 
 
 //////////////////////////////////////
-export const CONTAINER_MEMBERS = ZeroOrMore(Either(
+export const CONTAINER_MEMBERS: Rule<a.Declaration[]> = ZeroOrMore(Either(
   TEST_DECLARATION,
   COMPTIME_BLOCK,
   USINGNAMESPACE,
   FUNCTION_DECLARATION,
   VARIABLE_DECLARATION,
   CONTAINER_FIELD,
-))
+  any // will advance if we can't recognize an expression, so that the parser doesn't choke on invalid declarations.
+)).map(res => res.filter(r => r instanceof a.Declaration))
 
 
 export const ROOT = CONTAINER_MEMBERS
-.map(statements => new FileBlock()
+.map(statements => new a.FileBlock()
   .set('statements', statements)
 )
