@@ -560,9 +560,10 @@ export class Node {
   }
 
   _onParsed() {
-    this.onParsed()
+    // children speak first.
     for (var c of this.children)
       c._onParsed()
+    this.onParsed()
   }
 
   onParsed(): void { }

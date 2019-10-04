@@ -36,6 +36,7 @@ export class Expression extends Node {
  */
 export class Block extends Expression {
 
+  comptime = false
   parent_block: Opt<Block>
   label: Opt<string>
 
@@ -51,16 +52,14 @@ export class Block extends Expression {
     const parent_block = this.queryParent(Block)
     this.parent_block = parent_block
 
+    // Update declarations according to the statements we have in scope.
     for (var s of this.statements) {
       if (s instanceof Declaration)
         this.declarations[s.name] = s
     }
+
+
   }
-}
-
-
-export class ComptimeBlock extends Expression {
-
 }
 
 

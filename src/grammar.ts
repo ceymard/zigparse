@@ -204,7 +204,7 @@ export const LOOP_EXPRESSION = SeqObj({
   _2:             ')',
   opt_payload:    Opt(PAYLOAD),
   continue_exp:   Opt(S`: ( ${() => ASSIGN_EXPRESSION} )`),
-  body:           () => BLOCK_OR_EXPR,
+  body:           () => EXPRESSION,
   opt_else:       Opt(SeqObj({
                     kw_else:        'else',
                     opt_payload:    Opt(PAYLOAD),
@@ -212,7 +212,6 @@ export const LOOP_EXPRESSION = SeqObj({
                   })),
   opt_semi:       Opt(';')
 })
-
 
 
 export const FIELD_INIT = SeqObj({
@@ -247,6 +246,7 @@ export const PRIMARY_EXPRESSION = Either(
   IF_ELSE_EXPRESSION,
   COMPTIME_EXPRESSION,
   LOOP_EXPRESSION,
+  CURLY_SUFFIX_EXPRESSION
 )
 
 
@@ -289,12 +289,6 @@ export const EXPRESSION = SeqObj({
 export const ASSIGN_EXPRESSION = BinOp('=', EXPRESSION)
 
 
-export const LABELED_TYPE_EXPRESSION = Either(
-  SeqObj({lbl: BLOCK_LABEL, blk: () => BLOCK }),
-  LOOP_EXPRESSION
-)
-
-
 export const PRIMARY_TYPE_EXPRESSION: Rule<Expression> = Either(
   // Primitive types !
   Either(
@@ -302,43 +296,45 @@ export const PRIMARY_TYPE_EXPRESSION: Rule<Expression> = Either(
     Token(/c_(u?short|u?int|u?long(long)?|longdouble|void)/),
     Token(/bool|void|noreturn|type|anyerror|comptime_(int|float)/),
   ).map(r => new a.PrimitiveType().set('name', r.str)),
-  Either(
-    Token('true').map(() => new a.True),
-    Token('false').map(() => new a.False),
-    Token('null').map(() => new a.Null),
-    Token('undefined').map(() => new a.Undefined),
-    Token('promise').map(() => new a.Promise),
-    Token('unreachable').map(() => new a.Unreachable),
-  ),
-  Either(
-    Token(T.IDENT).map(n => new a.Identifier().set('value', n.str)),
-    Token(T.CHAR).map(n => new a.CharLiteral().set('value', n.str)),
-    Token(T.FLOAT).map(n => new a.FloatLiteral().set('value', n.str)),
-    Token(T.INTEGER).map(n => new a.IntegerLiteral().set('value', n.str)),
-    Token(T.CHAR).map(n => new a.CharLiteral().set('value', n.str)),
-    Token(T.STR).map(n => new a.StringLiteral().set('value', n.str)),
-  ),
-  Either(
-    // parenthesized expression
-    S`( ${() => PRIMARY_TYPE_EXPRESSION} )`,
-    // function call
-    SeqObj({
-      ident:    T.BUILTIN_IDENT,
-      args:     () => FUNCTION_CALL_ARGUMENTS
-    }).map(r => new a.BuiltinFunctionCall().set('name', r.ident.str).set('args', r.args)),
-    // container
-    () => CONTAINER_DECL,
-    // dot identifier, used in enums mostly.
-    S`. ${IDENT}`.map(n => new a.LeadingDotAccess().set('name', n)),
-    // error
-    S`error . ${IDENT}`.map(n => new a.ErrorField().set('name', n)),
-    () => SWITCH_EXPRESSION,
-    () => IF_ELSE_EXPRESSION,
-    () => FUNCTION_DECLARATION,
-    LABELED_TYPE_EXPRESSION,
-  ),
+  Token('true').map(() => new a.True),
+  Token('false').map(() => new a.False),
+  Token('null').map(() => new a.Null),
+  Token('undefined').map(() => new a.Undefined),
+  Token('promise').map(() => new a.Promise),
+  Token('unreachable').map(() => new a.Unreachable),
+  Token(T.IDENT).map(n => new a.Identifier().set('value', n.str)),
+  Token(T.CHAR).map(n => new a.CharLiteral().set('value', n.str)),
+  Token(T.FLOAT).map(n => new a.FloatLiteral().set('value', n.str)),
+  Token(T.INTEGER).map(n => new a.IntegerLiteral().set('value', n.str)),
+  Token(T.CHAR).map(n => new a.CharLiteral().set('value', n.str)),
+  Token(T.STR).map(n => new a.StringLiteral().set('value', n.str)),
+  // parenthesized expression
+  S`( ${() => PRIMARY_TYPE_EXPRESSION} )`,
+  // function call
+  SeqObj({
+    ident:    T.BUILTIN_IDENT,
+    args:     () => FUNCTION_CALL_ARGUMENTS
+  }).map(r => new a.BuiltinFunctionCall().set('name', r.ident.str).set('args', r.args)),
+  // container
+  () => CONTAINER_DECL,
+  // dot identifier, used in enums mostly.
+  S`. ${IDENT}`.map(n => new a.LeadingDotAccess().set('name', n)),
+  // error
+  S`error . ${IDENT}`.map(n => new a.ErrorField().set('name', n)),
+  () => SWITCH_EXPRESSION,
+  () => IF_ELSE_EXPRESSION,
+  () => FUNCTION_DECLARATION,
+  LOOP_EXPRESSION,
+  () => BLOCK,
 )
 
+
+export const TYPE_MODIFIER = Options({
+  align: S`align ( ${EXPRESSION} )`,
+  const: 'const',
+  volatile: 'volatile',
+  allowzero: 'allowzero'
+})
 
 ///
 export const PREFIX_TYPE_OP = EitherObj({
@@ -348,16 +344,11 @@ export const PREFIX_TYPE_OP = EitherObj({
               _1: '[',
               exp: EXPRESSION,
               _2: ']',
-              z: ZeroOrMore(Either(S`align ( ${EXPRESSION} )`, 'const', 'volatile', 'allowzero'))
+              modifiers: TYPE_MODIFIER
             }),
   pointer: SeqObj({
     ptrtype: Either('*', '**', '[*]', '[*c]'),
-    modifiers: EitherObj({
-      align:  S`align ( ${EXPRESSION} ${Opt(S`: ${INTEGER} : ${INTEGER}`)} )`,
-              kw_const,
-              kw_volatile,
-              kw_allowzero
-    })
+    modifiers: TYPE_MODIFIER
   })
 })
 
@@ -490,26 +481,18 @@ export const BLOCK = SeqObj({
 )
 
 
-////////////////////////////////////
-export const BLOCK_OR_EXPR = Either(
-  BLOCK,
-  EXPRESSION
-)
-
-
-
 //////////////////////////////////////
 export const COMPTIME_BLOCK = SeqObj({
-          kw_comptime,
-  block:  BLOCK,
+  comptime: Opt(kw_comptime),
+  block:    BLOCK,
 })
-.map(r => r.block)
+.map(r => r.block.set('comptime', !!r.comptime))
 
 
 ///////////////////////////////////////
 export const DEFER_STATEMENT = SeqObj({
   kw:         Either('defer', 'errdefer'),
-  contents:   BLOCK_OR_EXPR,
+  contents:   EXPRESSION,
 })
 
 
@@ -524,7 +507,6 @@ export const SWITCH_PRONG = SeqObj({
                       opt:  Opt(S`... ${EXPRESSION}`),
                     })
                   })),
-                  opt: Opt(',')
                 })
               ),
   tk:         '=>',
@@ -548,8 +530,7 @@ export const SWITCH_EXPRESSION = SeqObj({
 
 
 ////////////////////////////////
-export const STATEMENT: Rule<Node> = SeqObj({
-  stmt: Either(
+export const STATEMENT: Rule<Node> = Either(
     VARIABLE_DECLARATION,
     COMPTIME_BLOCK,
     DEFER_STATEMENT,
@@ -558,9 +539,8 @@ export const STATEMENT: Rule<Node> = SeqObj({
     LOOP_EXPRESSION,
     SWITCH_EXPRESSION,
     ASSIGN_EXPRESSION,
-  ),
-  opt_: Opt(';')
-}).map(e => e.stmt)
+    ';'
+)
 
 
 ////////////////////////////////////////
