@@ -150,6 +150,13 @@ export class Rule<T> {
 
   }
 
+  get d() {
+    return this.map(a => {
+      console.log('!')
+      return a
+    })
+  }
+
   tryParse(pos: number, input: Lexeme[]): ParseResult<T> {
     var res = this._parse(pos, input)
     if (res != null) {
@@ -209,7 +216,8 @@ export function Token(r: RegExp | string) {
      , r.flags) : null
   return new Rule((pos, input) => {
     var lexeme = input[pos]
-    if (lexeme && lexeme.is(r) || re_test && lexeme.str.match(re_test)) {
+    if (!lexeme) return null
+    if (lexeme.is(r) || re_test && lexeme.str.match(re_test)) {
       return [pos + 1, lexeme]
     }
     return null
@@ -223,14 +231,14 @@ export function SeqObj<T extends {[name: string]: RawRule<any>}>(_rules: T): Rul
   return new Rule<any>((pos, input) => {
     var p: ParseResult<any>
     var res = {} as any
-
     var start = 0
-    var end = rules.length - 1
+    var end = rules.length
     for (var i = start; i < end; i++) {
-      if (!(p = rules[i].tryParse(pos, input)))
+      if (!(p = rules[i].tryParse(pos, input))) {
         return null
-      else {
-        [pos, res[keys[i]]] = p
+      } else {
+        pos = p[0]
+        res[keys[i]] = p[1]
       }
     }
 
@@ -243,28 +251,30 @@ export function S<A extends RawRule<any>>(t: TemplateStringsArray, rules: A): Ru
 export function S<A extends RawRule<any>>(t: TemplateStringsArray): Rule<Lexeme[]>
 export function S(tpl: TemplateStringsArray, ...rules: RawRule<any>[]): Rule<any> {
 
-  const len = rules.length
-  const mapped_rules: RawRule<any>[] = []
+  const mapped_rules: Rule<any>[] = []
   const indexes = [] as number[]
 
   for (var i = 0; i < tpl.length; i++) {
     var item = tpl[i].trim()
     if (item) {
-      item.split(/[\s\n]+/g).map(it => mapped_rules.push(it))
+      item.split(/[\s\n]+/g).map(it => mapped_rules.push(mkRule(it)))
     }
     if (rules[i]) {
       indexes.push(mapped_rules.length)
-      mapped_rules.push(rules[i])
+      mapped_rules.push(mkRule(rules[i]))
     }
   }
 
-  return (Seq as any)(...mapped_rules).map((res: any) => {
-    const _res = new Array(len)
-    for (var i = 0; i < len; i++) {
-      _res[i] = res[indexes[i]]
+  return new Rule((pos, input) => {
+    var res = []
+    for (var r of mapped_rules) {
+      var p = r.tryParse(pos, input)
+      if (!p) return null
+      pos = p[0]
+      res.push(p[1])
     }
 
-    return len > 1 ? _res : _res[0]
+    return [pos, res[indexes[0]]]
   })
 }
 
@@ -348,7 +358,7 @@ export function Peek(r: RawRule<any>) {
 }
 
 
-export const any = new Rule((pos, input) => [pos + 1, input[pos]])
+export const any = new Rule((pos, input) => pos >= input.length ? null : [pos + 1, input[pos]])
 
 export function ZeroOrMore<T>(_r: RawRule<T>): Rule<T[]> {
   const rule = mkRule(_r) as Rule<T>
@@ -367,6 +377,7 @@ export function ZeroOrMore<T>(_r: RawRule<T>): Rule<T[]> {
 export function Opt<T extends RawRule<any>>(_r: T): Rule<Result<T> | null> {
   const rule = mkRule(_r) as any
   return new Rule((pos, input) => {
+    if (pos >= input.length) return null // even Opt fails at the end of input !
     const p = rule.tryParse(pos, input)
     if (p) return p
     else return [pos, null]

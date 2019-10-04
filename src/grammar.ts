@@ -10,8 +10,8 @@ export const T = {
   STR: /"(\\"|.)*"|\\\\[^\n]*\n(\s*\\\\[^\n]*\n)*/,
   CHAR: /'(\\'|.)*'/,
   BUILTIN_IDENT: /@[A-Za-z_][A-Za-z_0-9]*/,
-  INTEGER: /sss/, // fixme
-  FLOAT: /sss/, // fixme
+  FLOAT: /\d+.\d+/, // fixme
+  INTEGER: /\d+/, // fixme
   IDENT: /[A-Za-z_]\w*|@"[^"]+"/,
   OP: new RegExp([
     /&=|&/,
