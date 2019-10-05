@@ -10,5 +10,5 @@ const l = new Lexer(Object.values(T))
 const input = l.feed(f)
 const res = ROOT.parse(input) as a.FileBlock
 
-console.log(res.statements)
+console.log(res.statements.map(s => s.range))
 // console.log(f)

@@ -184,7 +184,12 @@ export class Rule<T> {
 
       // If the result is a node, then assign it its position.
       if (res[1] instanceof Node) {
-
+        var st = input[pos]
+        var en = input[res[0] - 1]
+        res[1].range = [
+          new Position(st.offset, st.line, st.col),
+          new Position(en.offset + en.str.length, en.line, en.col)
+        ]
       }
         // return [res[0], this._maps(res[1], pos, res[0], input)]
       return res
