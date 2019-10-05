@@ -241,10 +241,11 @@ export const CURLY_SUFFIX_EXPRESSION = SeqObj({
 
 /////////////////////////////////////////
 export const PRIMARY_EXPRESSION = Either(
+  S`return ${() => EXPRESSION}`.map(e => new a.ReturnExpression().set('exp', e)),
   IF_ELSE_EXPRESSION,
   COMPTIME_EXPRESSION,
   LOOP_EXPRESSION,
-  CURLY_SUFFIX_EXPRESSION
+  CURLY_SUFFIX_EXPRESSION,
 )
 
 

@@ -232,3 +232,8 @@ export class DotBinOp extends BinOpExpression { }
 export class ArrayAccessOp extends BinOpExpression {
   slice: Opt<Expression>
 }
+
+
+export class ReturnExpression extends Expression {
+  exp: Opt<Expression>
+}
