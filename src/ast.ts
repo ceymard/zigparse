@@ -9,7 +9,7 @@ export class Declaration extends Node {
   pub = false
   comptime = false
   extern = false
-  name = ''
+  name!: Identifier
   type: Opt<Expression>
   value: Opt<Expression> // when used with extern, there may not be a value
 }
@@ -65,12 +65,12 @@ export class Block extends Expression {
 
 
 export class LeadingDotAccess extends Expression {
-  name = ''
+  name!: Identifier
 }
 
 
 export class ErrorField extends Expression {
-  name = ''
+  name!: Identifier
 }
 
 export class ErrorUnion extends Expression {
@@ -101,11 +101,11 @@ export class IntegerLiteral extends Literal { }
 export class FloatLiteral extends Literal { }
 
 export class PrimitiveType extends Expression {
-  name = ''
+  name!: Identifier
 }
 
 export class FunctionCall extends Expression {
-  name = ''
+  lhs!: Expression
   args = [] as Expression[]
 }
 
@@ -119,7 +119,7 @@ export class BuiltinFunctionCall extends Expression {
 
 export class FunctionArgumentDefinition extends Expression {
   comptime = false
-  name = ''
+  name!: Identifier
   type!: Expression
 }
 
@@ -129,13 +129,13 @@ export class FunctionDefinition extends Expression {
   extern = false
   args = [] as FunctionArgumentDefinition[]
   return_type: Opt<Expression>
+  block: Opt<Block>
 }
 
 
 export class VariableDeclaration extends Declaration {
   pub = false
   extern = false
-  name = ''
   type: Opt<Expression>
   value: Opt<Expression>
 }
@@ -206,4 +206,29 @@ export class FileBlock extends StructDeclaration {
 
   // TODO a file should let me find a Node by its position.
 
+}
+
+
+export class UnaryOpExpression extends Expression {
+  exp: Opt<Expression>
+}
+
+// .*
+export class DerefOp extends UnaryOpExpression { }
+// .?
+export class DeOpt extends UnaryOpExpression { }
+// !
+export class NotOpt extends UnaryOpExpression { }
+
+export class BinOpExpression extends Expression {
+  rhs: Opt<Expression>
+  lhs: Opt<Expression>
+}
+
+// exp . ident
+export class DotBinOp extends BinOpExpression { }
+
+// exp [ .. ]
+export class ArrayAccessOp extends BinOpExpression {
+  slice: Opt<Expression>
 }

@@ -378,6 +378,16 @@ export function Peek(r: RawRule<any>) {
 
 export const any = new Rule((pos, input) => pos >= input.length ? null : [pos + 1, input[pos]])
 
+export const AnythingBut = (_r: RawRule<any>) => {
+  const r = mkRule(_r)
+  return new Rule((pos, input) => {
+    if (r.tryParse(pos, input))
+      return null
+    return pos >= input.length ? null : [pos + 1, input[pos]]
+  })
+}
+
+
 export function ZeroOrMore<T>(_r: RawRule<T>): Rule<T[]> {
   const rule = mkRule(_r) as Rule<T>
   return new Rule((pos, input) => {
@@ -562,8 +572,8 @@ export class Position {
 
 export class Node {
 
-  protected parent: Node | null = null
-  protected children: Node[] = []
+  parent: Node | null = null
+  children: Node[] = []
 
   /**
    * Range expressed in offset
@@ -578,12 +588,21 @@ export class Node {
     // so that they become children
     if (v instanceof Node) {
       this.children.push(v)
+      v.parent = this
     } else if (Array.isArray(v)) {
       for (var _v of v) {
         if (!(_v instanceof Node)) break
         this.children.push(_v)
+        _v.parent = this
       }
     }
+
+    // Keep the children sorted.
+    this.children.sort((a, b) => {
+      var a1 = a.range[0].offset
+      var b1 = b.range[0].offset
+      return a1 > b1 ? 1 : a1 < b1 ? -1 : 0
+    })
 
     return this
   }

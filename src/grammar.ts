@@ -1,5 +1,5 @@
 
-import { SeqObj, Opt, Either, Token, S, ZeroOrMore, Node, RawRule, separated_by, EitherObj, Rule, Options, any, Lexeme } from './libparse'
+import { SeqObj, Opt, Either, Token, S, ZeroOrMore, Node, RawRule, separated_by, EitherObj, Rule, Options, any, Lexeme, AnythingBut, Lexer } from './libparse'
 import { Expression, TypeExpression } from './expression'
 import * as a from './ast'
 
@@ -76,8 +76,7 @@ export const DOC = Opt(Token(T.BLOCK_COMMENT).map(t => t.str))
 
 
 ///////////////////////////////////
-export const IDENT = Token(T.IDENT)
-.map(id => id.str)
+export const IDENT = Token(T.IDENT).map(n => new a.Identifier().set('value', n.str))
 
 
 ///////////////////////////////
@@ -292,17 +291,17 @@ export const ASSIGN_EXPRESSION = BinOp('=', EXPRESSION)
 export const PRIMARY_TYPE_EXPRESSION: Rule<Expression> = Either(
   // Primitive types !
   Either(
-    Token(/[uif]\d+/),
-    Token(/c_(u?short|u?int|u?long(long)?|longdouble|void)/),
-    Token(/bool|void|noreturn|type|anyerror|comptime_(int|float)/),
-  ).map(r => new a.PrimitiveType().set('name', r.str)),
+    Token(/[uif]\d+/).map(n => new a.Identifier().set('value', n.str)),
+    Token(/c_(u?short|u?int|u?long(long)?|longdouble|void)/).map(n => new a.Identifier().set('value', n.str)),
+    Token(/bool|void|noreturn|type|anyerror|comptime_(int|float)/).map(n => new a.Identifier().set('value', n.str)),
+  ).map(r => new a.PrimitiveType().set('name', r)),
   Token('true').map(() => new a.True),
   Token('false').map(() => new a.False),
   Token('null').map(() => new a.Null),
   Token('undefined').map(() => new a.Undefined),
   Token('promise').map(() => new a.Promise),
   Token('unreachable').map(() => new a.Unreachable),
-  Token(T.IDENT).map(n => new a.Identifier().set('value', n.str)),
+  IDENT,
   Token(T.CHAR).map(n => new a.CharLiteral().set('value', n.str)),
   Token(T.FLOAT).map(n => new a.FloatLiteral().set('value', n.str)),
   Token(T.INTEGER).map(n => new a.IntegerLiteral().set('value', n.str)),
@@ -323,7 +322,7 @@ export const PRIMARY_TYPE_EXPRESSION: Rule<Expression> = Either(
   S`error . ${IDENT}`.map(n => new a.ErrorField().set('name', n)),
   () => SWITCH_EXPRESSION,
   () => IF_ELSE_EXPRESSION,
-  () => FUNCTION_DECLARATION,
+  () => FUNCTION_VALUE_DEFINITION,
   LOOP_EXPRESSION,
   () => BLOCK,
 )
@@ -337,33 +336,37 @@ export const TYPE_MODIFIER = Options({
 })
 
 ///
-export const PREFIX_TYPE_OP = EitherObj({
-  optional: '?',
-  promise: S`promise ->`,
-  array_type: SeqObj({
-              _1: '[',
-              exp: EXPRESSION,
-              _2: ']',
-              modifiers: TYPE_MODIFIER
-            }),
-  pointer: SeqObj({
+export const PREFIX_TYPE_OP = Either(
+  // make the type optional
+  '?',
+  // a promise
+  S`promise ->`,
+  // declaration of an array type or a slice
+  SeqObj({
+    _1: '[',
+    exp: EXPRESSION,
+    _2: ']',
+    modifiers: TYPE_MODIFIER
+  }),
+  // declaration of a pointer type
+  SeqObj({
     ptrtype: Either('*', '**', '[*]', '[*c]'),
     modifiers: TYPE_MODIFIER
   })
-})
+)
 
 
-export const SUFFIX_OPERATOR = EitherObj({
-  slice:    SeqObj({
-              _1: '[',
-              exp: EXPRESSION,
-              slice: Opt(S`.. ${EXPRESSION}`),
-              _2: ']'
-            }),
-  dot_identifier: S`. ${IDENT}`,
-  dot_asterisk: S`. *`,
-  dot_question: S`. ?`,
-})
+export const SUFFIX_OPERATOR = Either(
+  SeqObj({
+    _1: '[',
+    exp: EXPRESSION,
+    slice: Opt(S`.. ${EXPRESSION}`),
+    _2: ']'
+  }).map(e => new a.ArrayAccessOp().set('rhs', e.exp).set('slice', e.slice)), // FIXME this needs slice !
+  S`. ${IDENT}`.map(e => new a.DotBinOp().set('rhs', e)),
+  S`. *`.map(e => new a.DerefOp()),
+  S`. ?`.map(e => new a.DeOpt()),
+)
 
 
 
@@ -378,12 +381,22 @@ export const ASYNC_TYPE_EXPRESSION = SeqObj({
 export const SUFFIX_EXPRESSION = Either(
   ASYNC_TYPE_EXPRESSION,
   SeqObj({
-    type: PRIMARY_TYPE_EXPRESSION,
-    modifiers: Options({
-      args: () => FUNCTION_CALL_ARGUMENTS,
-      suf: SUFFIX_OPERATOR
-    })
-  }).map(e => e.type)
+    exp: PRIMARY_TYPE_EXPRESSION,
+    modifiers: ZeroOrMore(Either(
+      () => FUNCTION_CALL_ARGUMENTS.map(f => new a.FunctionCall().set('args', f)),
+      SUFFIX_OPERATOR
+    ))
+  }).map(e => {
+    if (e.modifiers.length > 0) {
+      var xp = e.exp as a.Expression
+      for (var m of e.modifiers) {
+        (m as a.BinOpExpression).set('lhs', xp)
+        xp = m
+      }
+      return xp
+    }
+    return e.exp
+  })
 )
 
 
@@ -443,7 +456,9 @@ export const FUNCTION_ARGUMENT = SeqObj({
   type:     Either(TYPE_EXPRESSION, DOT3, VAR),
 })
 .map(r =>
-  new Node()
+  new a.FunctionArgumentDefinition()
+    .set('name', r.ident)
+    .set('type', r.type)
 )
 
 
@@ -454,19 +469,46 @@ export const FUNCTION_CALL_ARGUMENTS = SeqObj({
 }).map(r => r.args)
 
 
-/////////////////////////////////////////
-export const FUNCTION_DECLARATION = SeqObj({
+export const FUNCTION_BODY_DECLARATION = SeqObj({
+  _2:           '(',
+  args:         separated_by(',', FUNCTION_ARGUMENT),
+  _3:           ')',
+  return_type:  TYPE_EXPRESSION,
+  definition:   Either(Token(tk_semicolon).map(() => null), () => BLOCK),
+}).map(res => new a.FunctionDefinition()
+  .set('args', res.args)
+  .set('return_type', res.return_type)
+  .set('block', res.definition)
+)
+
+
+export const FUNCTION_VALUE_DEFINITION = SeqObj({
   doc:          DOC,
                 opt_kw_fncc,
                 OPT_EXTERN,
                 opt_kw_threadlocal,
                 opt_kw_inline,
-  args:         separated_by(',', FUNCTION_ARGUMENT),
-  return_type:  TYPE_EXPRESSION,
-  definition:   EitherObj({tk_semicolon, block: () => BLOCK}),
+  _1:           'fn',
+  body:         FUNCTION_BODY_DECLARATION
+}).map(res => res.body)
+
+
+/////////////////////////////////////////
+export const OLD_FUNCTION_DECLARATION = SeqObj({
+  doc:          DOC,
+                opt_kw_fncc,
+                OPT_EXTERN,
+                opt_kw_threadlocal,
+                opt_kw_inline,
+  _1:           'fn',
+  ident:        IDENT,
+  body:         FUNCTION_BODY_DECLARATION
 })
 .map(res =>
-  new Node()
+  new a.VariableDeclaration()
+  .set('name', res.ident)
+  .set('value', res.body)
+  )
 )
 
 
@@ -474,8 +516,11 @@ export const FUNCTION_DECLARATION = SeqObj({
 export const BLOCK = SeqObj({
   opt_label:  Opt(BLOCK_LABEL),
               tk_lbrace,
-  statements: ZeroOrMore(() => STATEMENT),
-              tk_rbrace,
+  statements: ZeroOrMore(Either(
+    () => STATEMENT,
+    AnythingBut('}') // if we choke on a statement, just filter
+  )).map(s => s.filter(e => !(e instanceof Lexeme))),
+  tk_rbrace,
 })
 .map(({statements}) =>
   new a.Block()
@@ -599,7 +644,7 @@ export const CONTAINER_MEMBERS: Rule<a.Declaration[]> = ZeroOrMore(Either(
   TEST_DECLARATION,
   COMPTIME_BLOCK,
   USINGNAMESPACE,
-  FUNCTION_DECLARATION,
+  OLD_FUNCTION_DECLARATION,
   CONTAINER_FIELD,
   any, // will advance if we can't recognize an expression, so that the parser doesn't choke on invalid declarations.
 )).map(res => res.filter(r => !(r instanceof Lexeme)))
