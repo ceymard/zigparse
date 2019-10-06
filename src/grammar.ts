@@ -149,13 +149,13 @@ export const PAYLOAD = SeqObj({
   _s:         '|',
   opt_ptr:    OptBool('*'),
   ident:      IDENT,
-  opt_index:  Opt(SeqObj({
-                _1:       ',',
-                ident:    IDENT,
-              })
-              .map(e => e.ident)),
+  opt_index:  Opt(S`. ${IDENT}`),
   _e:         '|',
 })
+.map(p => new a.Payload()
+  .set('exp', p.ident)
+  .set('index', p.opt_index)
+)
 
 
 //////////////////////////////////////
@@ -278,7 +278,10 @@ export const BITSHIFT_EXPRESSION = BinOp(Operator(/<<|>>/), ADDITION_EXPRESSION)
 export const BITWISE_EXPRESSION = BinOp(
   // FIXME catch |payload| is not correctly handled !
   // should that create a block or something ???
-  Either(Operator(/&|\^|\||orelse/), S`catch ${Opt(PAYLOAD)}`), BITSHIFT_EXPRESSION
+  Either(
+    Operator(/&|\^|\||orelse/),
+    S`catch ${Opt(PAYLOAD)}`.map(c => new a.CatchOperator().set('payload', c))
+  ), BITSHIFT_EXPRESSION
 )
 export const COMPARE_EXPRESSION = BinOp(Operator(/==|!=|<=|>=|<|>/), BITWISE_EXPRESSION)
 export const BOOL_AND_EXPRESSION = BinOp(Operator('and'), COMPARE_EXPRESSION)

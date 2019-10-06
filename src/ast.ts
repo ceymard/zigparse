@@ -231,6 +231,16 @@ export class BinOpExpression extends Expression {
   lhs: Opt<Expression>
 }
 
+export class Payload extends Node {
+  exp: Opt<Expression>
+  index: Opt<Expression>
+}
+
+export class CatchOperator extends Operator {
+  value = 'catch'
+  payload: Opt<Payload>
+}
+
 // exp . ident
 export class DotBinOp extends BinOpExpression { }
 
