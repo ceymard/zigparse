@@ -153,6 +153,7 @@ export const PAYLOAD = SeqObj({
   _e:         '|',
 })
 .map(p => new a.Payload()
+  .set('is_pointer', p.opt_ptr)
   .set('exp', p.ident)
   .set('index', p.opt_index)
 )
@@ -278,6 +279,8 @@ export const BITSHIFT_EXPRESSION = BinOp(Operator(/<<|>>/), ADDITION_EXPRESSION)
 export const BITWISE_EXPRESSION = BinOp(
   // FIXME catch |payload| is not correctly handled !
   // should that create a block or something ???
+  // scope should be resolved by calling super() with the nodes !
+  // and overloading it.
   Either(
     Operator(/&|\^|\||orelse/),
     S`catch ${Opt(PAYLOAD)}`.map(c => new a.CatchOperator().set('payload', c))
@@ -341,8 +344,11 @@ export const PRIMARY_TYPE_EXPRESSION: Rule<Expression> = Either(
 )
 
 
+export const BYTE_ALIGN = S`align ( ${EXPRESSION} )`
+
+
 export const TYPE_MODIFIER = Options({
-  align: S`align ( ${EXPRESSION} )`,
+  align: BYTE_ALIGN,
   const: 'const',
   volatile: 'volatile',
   allowzero: 'allowzero'
@@ -449,8 +455,10 @@ export const VARIABLE_DECLARATION = SeqObj({
               kw_const_var,
   ident:      IDENT,
   opt_type:   Opt(S` : ${Opt(EXPRESSION)}`),
-  eq:         Token(tk_equal),
-  value:      EXPRESSION,
+  align:      Opt(BYTE_ALIGN),
+  ln:         Opt(S`linksection ( ${EXPRESSION} )`),
+  value:      Opt(S`= ${EXPRESSION}`),
+  opt_semi:   Opt(';')
 })
 .map(({ident, opt_type, value}) =>
   new a.VariableDeclaration()

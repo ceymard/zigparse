@@ -5,7 +5,22 @@ import { Node } from "./libparse"
 export type Opt<T> = T | null | undefined
 
 
-export class Declaration extends Node {
+// FIXME missing Node.getDeclarations
+
+export class ZigNode extends Node {
+
+  parent!: ZigNode
+
+  getAvailableNames(): {[name: string]: ZigNode} {
+    if (this.parent) {
+      return this.parent.getAvailableNames()
+    }
+    return {}
+  }
+
+}
+
+export class Declaration extends ZigNode {
   pub = false
   comptime = false
   extern = false
@@ -15,7 +30,7 @@ export class Declaration extends Node {
 }
 
 
-export class Expression extends Node {
+export class Expression extends ZigNode {
 
   getValue(): Expression | null {
     return null
@@ -231,14 +246,30 @@ export class BinOpExpression extends Expression {
   lhs: Opt<Expression>
 }
 
-export class Payload extends Node {
-  exp: Opt<Expression>
-  index: Opt<Expression>
+export class Payload extends ZigNode {
+  is_pointer = false
+  name!: Identifier
+  index: Opt<Identifier>
 }
 
 export class CatchOperator extends Operator {
   value = 'catch'
   payload: Opt<Payload>
+
+  getAvailableNames() {
+    var names = {} as {[name: string]: ZigNode}
+    if (this.payload) {
+
+      // More like this should be a variable declaration
+      // whose value is @typeInfo(original_exp).ErrorUnion.error_set
+      names[this.payload.name.value] = this.payload.name
+
+      throw 'not implemented'
+      // throw 'not implemented'
+      // names[this.payload.exp]
+    }
+    return Object.assign({}, this.parent.getAvailableNames(), names)
+  }
 }
 
 // exp . ident
