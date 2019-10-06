@@ -1,5 +1,5 @@
 
-import { SeqObj, Opt, Either, Token, S, ZeroOrMore, Node, RawRule, separated_by, EitherObj, Rule, Options, any, Lexeme, AnythingBut } from './libparse'
+import { SeqObj, Opt, Either, Token, S, ZeroOrMore, Node, RawRule, separated_by, EitherObj, Rule, Options, any, Lexeme, AnythingBut, Peek } from './libparse'
 import * as a from './ast'
 
 
@@ -154,7 +154,7 @@ export const PAYLOAD = SeqObj({
 })
 .map(p => new a.Payload()
   .set('is_pointer', p.opt_ptr)
-  .set('exp', p.ident)
+  .set('name', p.ident)
   .set('index', p.opt_index)
 )
 
@@ -317,7 +317,6 @@ export const PRIMARY_TYPE_EXPRESSION: Rule<Expression> = Either(
   Token('undefined').map(() => new a.Undefined),
   Token('promise').map(() => new a.Promise),
   Token('unreachable').map(() => new a.Unreachable),
-  IDENT,
   Token(T.CHAR).map(n => new a.CharLiteral().set('value', n.str)),
   Token(T.FLOAT).map(n => new a.FloatLiteral().set('value', n.str)),
   Token(T.INTEGER).map(n => new a.IntegerLiteral().set('value', n.str)),
@@ -340,7 +339,8 @@ export const PRIMARY_TYPE_EXPRESSION: Rule<Expression> = Either(
   () => IF_ELSE_EXPRESSION,
   () => FUNCTION_VALUE_DEFINITION,
   LOOP_EXPRESSION,
-  () => BLOCK,
+  SeqObj({pe: Peek(`: ${IDENT}`), blk: () => BLOCK}).map(a => a.blk),
+  IDENT,
 )
 
 
