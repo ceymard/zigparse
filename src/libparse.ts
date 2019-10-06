@@ -604,6 +604,13 @@ export class Node {
       return a1 > b1 ? 1 : a1 < b1 ? -1 : 0
     })
 
+    if (!this.range && this.children.length) {
+      this.range = [
+        this.children[0].range[0],
+        this.children[this.children.length - 1].range[1]
+      ]
+    }
+
     return this
   }
 

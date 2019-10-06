@@ -210,7 +210,8 @@ export class FileBlock extends StructDeclaration {
 
 
 export class UnaryOpExpression extends Expression {
-  exp: Opt<Expression>
+  op: Opt<Operator>
+  rhs: Opt<Expression>
 }
 
 // .*

@@ -250,10 +250,10 @@ export const PRIMARY_EXPRESSION = Either(
 
 /////////////////////////////////////////
 export const PREFIX_EXPRESSION = SeqObj({
-  op:           Opt(/\!/),
+  op:           Opt(Token(/try|\!|-|~|-%|&|await/).map(t => new a.Operator().set('value', t.str))),
   exp:          PRIMARY_EXPRESSION
 })
-.map(e => e.exp)
+.map(e => e.op ? new a.UnaryOpExpression().set('rhs', e.exp).set('op', e.op) : e.exp)
 
 const BinOp = (op: RawRule<any>, exp: Rule<Expression>) => SeqObj({
   exp,
@@ -272,11 +272,15 @@ const BinOp = (op: RawRule<any>, exp: Rule<Expression>) => SeqObj({
 
 export const Operator = (n: string | RegExp) => Token(n).map(o => new a.Operator().set('value', o.str))
 
-export const MULTIPLY_EXPRESSION = BinOp(Operator(/\*/), PREFIX_EXPRESSION)
-export const ADDITION_EXPRESSION = BinOp(Operator(/\+/), MULTIPLY_EXPRESSION)
-export const BITSHIFT_EXPRESSION = BinOp(Operator(/<</), ADDITION_EXPRESSION)
-export const BITWISE_EXPRESSION = BinOp(Operator(/>>/), BITSHIFT_EXPRESSION)
-export const COMPARE_EXPRESSION = BinOp(Operator(/==/), BITWISE_EXPRESSION)
+export const MULTIPLY_EXPRESSION = BinOp(Operator(/\*|\|\||\/|%|\*\*|\*%/), PREFIX_EXPRESSION)
+export const ADDITION_EXPRESSION = BinOp(Operator(/\+|-|\+%|-%|\+\+/), MULTIPLY_EXPRESSION)
+export const BITSHIFT_EXPRESSION = BinOp(Operator(/<<|>>/), ADDITION_EXPRESSION)
+export const BITWISE_EXPRESSION = BinOp(
+  // FIXME catch |payload| is not correctly handled !
+  // should that create a block or something ???
+  Either(Operator(/&|\^|\||orelse/), S`catch ${Opt(PAYLOAD)}`), BITSHIFT_EXPRESSION
+)
+export const COMPARE_EXPRESSION = BinOp(Operator(/==|!=|<=|>=|<|>/), BITWISE_EXPRESSION)
 export const BOOL_AND_EXPRESSION = BinOp(Operator('and'), COMPARE_EXPRESSION)
 export const BOOL_OR_EXPRESSION = BinOp(Operator('or'), BOOL_AND_EXPRESSION)
 
@@ -291,7 +295,7 @@ export const EXPRESSION = SeqObj({
 
 
 ///////////////////////////////////////////////////////
-export const ASSIGN_EXPRESSION = BinOp(Operator('='), EXPRESSION)
+export const ASSIGN_EXPRESSION = BinOp(Operator(/\*=|\/=|%=|\+=|-=|<<=|>>=|&=|\^=|\|=|\*%=|\+%=|-%=|=/), EXPRESSION)
 
 
 export const PRIMARY_TYPE_EXPRESSION: Rule<Expression> = Either(
