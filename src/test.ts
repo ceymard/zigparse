@@ -20,6 +20,8 @@ function show_node(n: Node, indent = '', prefix = '') {
     suppl.push(ch.green('value') + ': ' + n.value)
   else if (n instanceof a.Literal)
     suppl.push(ch.yellow(n.value))
+  else if (n instanceof a.Operator)
+    suppl.push(ch.red(n.value))
 
   console.log(indent + prefix + n.constructor.name + (suppl.length ? '(' + suppl.join(', ') + ')' : ''))
   for (var c of n.children) {

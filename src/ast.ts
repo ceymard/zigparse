@@ -220,7 +220,12 @@ export class DeOpt extends UnaryOpExpression { }
 // !
 export class NotOpt extends UnaryOpExpression { }
 
+export class Operator extends Expression {
+  value = ''
+}
+
 export class BinOpExpression extends Expression {
+  operator!: Operator
   rhs: Opt<Expression>
   lhs: Opt<Expression>
 }

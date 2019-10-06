@@ -1,6 +1,5 @@
 
-import { SeqObj, Opt, Either, Token, S, ZeroOrMore, Node, RawRule, separated_by, EitherObj, Rule, Options, any, Lexeme, AnythingBut, Lexer } from './libparse'
-import { Expression, TypeExpression } from './expression'
+import { SeqObj, Opt, Either, Token, S, ZeroOrMore, Node, RawRule, separated_by, EitherObj, Rule, Options, any, Lexeme, AnythingBut } from './libparse'
 import * as a from './ast'
 
 
@@ -258,22 +257,28 @@ export const PREFIX_EXPRESSION = SeqObj({
 
 const BinOp = (op: RawRule<any>, exp: Rule<Expression>) => SeqObj({
   exp,
-  rest: ZeroOrMore(SeqObj({op, exp}))
+  // we allow the rhs to be empty
+  rest: ZeroOrMore(SeqObj({op, exp: Opt(exp)}))
 }).map(({exp, rest}) => {
   var res = exp
   for (var r of rest) {
-
+    res = new a.BinOpExpression()
+      .set('operator', r.op)
+      .set('lhs', res)
+      .set('rhs', r.exp)
   }
   return res
 })
 
-export const MULTIPLY_EXPRESSION = BinOp(/\*/, PREFIX_EXPRESSION)
-export const ADDITION_EXPRESSION = BinOp(/\+/, MULTIPLY_EXPRESSION)
-export const BITSHIFT_EXPRESSION = BinOp(/<</, ADDITION_EXPRESSION)
-export const BITWISE_EXPRESSION = BinOp(/>>/, BITSHIFT_EXPRESSION)
-export const COMPARE_EXPRESSION = BinOp(/==/, BITWISE_EXPRESSION)
-export const BOOL_AND_EXPRESSION = BinOp('and', COMPARE_EXPRESSION)
-export const BOOL_OR_EXPRESSION = BinOp('or', BOOL_AND_EXPRESSION)
+export const Operator = (n: string | RegExp) => Token(n).map(o => new a.Operator().set('value', o.str))
+
+export const MULTIPLY_EXPRESSION = BinOp(Operator(/\*/), PREFIX_EXPRESSION)
+export const ADDITION_EXPRESSION = BinOp(Operator(/\+/), MULTIPLY_EXPRESSION)
+export const BITSHIFT_EXPRESSION = BinOp(Operator(/<</), ADDITION_EXPRESSION)
+export const BITWISE_EXPRESSION = BinOp(Operator(/>>/), BITSHIFT_EXPRESSION)
+export const COMPARE_EXPRESSION = BinOp(Operator(/==/), BITWISE_EXPRESSION)
+export const BOOL_AND_EXPRESSION = BinOp(Operator('and'), COMPARE_EXPRESSION)
+export const BOOL_OR_EXPRESSION = BinOp(Operator('or'), BOOL_AND_EXPRESSION)
 
 
 ////////////////////////////////////
@@ -286,7 +291,7 @@ export const EXPRESSION = SeqObj({
 
 
 ///////////////////////////////////////////////////////
-export const ASSIGN_EXPRESSION = BinOp('=', EXPRESSION)
+export const ASSIGN_EXPRESSION = BinOp(Operator('='), EXPRESSION)
 
 
 export const PRIMARY_TYPE_EXPRESSION: Rule<Expression> = Either(
@@ -364,7 +369,7 @@ export const SUFFIX_OPERATOR = Either(
     slice: Opt(S`.. ${EXPRESSION}`),
     _2: ']'
   }).map(e => new a.ArrayAccessOp().set('rhs', e.exp).set('slice', e.slice)), // FIXME this needs slice !
-  S`. ${IDENT}`.map(e => new a.DotBinOp().set('rhs', e)),
+  SeqObj({op: Operator('.'), id: IDENT}).map(e => new a.DotBinOp().set('rhs', e.id).set('operator', e.op)),
   S`. *`.map(e => new a.DerefOp()),
   S`. ?`.map(e => new a.DeOpt()),
 )
@@ -465,19 +470,19 @@ export const FUNCTION_ARGUMENT = SeqObj({
 
 export const FUNCTION_CALL_ARGUMENTS = SeqObj({
   _1:           '(',
-  args:         separated_by(',', EXPRESSION),
+  args:         Opt(separated_by(',', EXPRESSION)),
   _2:           ')'
-}).map(r => r.args)
+}).map(r => r.args || [])
 
 
 export const FUNCTION_BODY_DECLARATION = SeqObj({
   _2:           '(',
-  args:         separated_by(',', FUNCTION_ARGUMENT),
+  args:         Opt(separated_by(',', FUNCTION_ARGUMENT)),
   _3:           ')',
   return_type:  TYPE_EXPRESSION,
   definition:   Either(Token(tk_semicolon).map(() => null), () => BLOCK),
 }).map(res => new a.FunctionDefinition()
-  .set('args', res.args)
+  .set('args', res.args || [])
   .set('return_type', res.return_type)
   .set('block', res.definition)
 )
