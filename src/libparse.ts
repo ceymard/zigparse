@@ -267,6 +267,7 @@ export function SeqObj<T extends {[name: string]: RawRule<any>}>(_rules: T): Rul
 
 export function S<A extends RawRule<any>>(t: TemplateStringsArray, rules: A): Rule<Result<A>>
 export function S<A extends RawRule<any>>(t: TemplateStringsArray): Rule<Lexeme[]>
+export function S<A extends RawRule<any>[]>(t: TemplateStringsArray, ...rules: A): Rule<{[K in keyof A]: Result<A[K]>}>
 export function S(tpl: TemplateStringsArray, ...rules: RawRule<any>[]): Rule<any> {
 
   const mapped_rules: Rule<any>[] = []
@@ -284,7 +285,7 @@ export function S(tpl: TemplateStringsArray, ...rules: RawRule<any>[]): Rule<any
   }
 
   return new Rule((pos, input) => {
-    var res = []
+    var res = [] as any[]
     for (var r of mapped_rules) {
       var p = r.tryParse(pos, input)
       if (!p) return null
@@ -292,7 +293,9 @@ export function S(tpl: TemplateStringsArray, ...rules: RawRule<any>[]): Rule<any
       res.push(p[1])
     }
 
-    return [pos, res[indexes[0]]]
+    if (indexes.length === 1)
+      return [pos, res[indexes[0]]]
+    return [pos, indexes.map(idx => res[idx])]
   })
 }
 
@@ -542,7 +545,7 @@ export function second<A>(a: [any, A, ...any[]]) { return a[1] }
 export function third<A>(a: [any, any, A, ...any[]]) { return a[2] }
 
 export const separated_by = <T>(separator: RawRule<any>, rule: RawRule<T>) =>
-  SeqObj({
+  Opt(SeqObj({
     rule: rule as Rule<T>,
     more: ZeroOrMore(
       SeqObj({sep: separator, rule}).map(({rule}) => {
@@ -550,7 +553,7 @@ export const separated_by = <T>(separator: RawRule<any>, rule: RawRule<T>) =>
       })
     ),
     opt_end: Opt(separator)
-  }).map(({rule, more}) => [rule, ...more])
+  }).map(({rule, more}) => [rule, ...more])).map(v => v || [])
 
 
 export function Forward<T>(fn: () => RawRule<T>): Rule<T> {

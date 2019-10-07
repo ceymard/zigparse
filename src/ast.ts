@@ -52,7 +52,6 @@ export class Expression extends ZigNode {
 export class Block extends Expression {
 
   comptime = false
-  parent_block: Opt<Block>
   label: Opt<string>
 
   declarations: {[name: string]: Declaration} = {}
@@ -62,19 +61,6 @@ export class Block extends Expression {
   // used when the block is asked what type it is...
   breaks: Expression[] = []
 
-  onParsed() {
-    // find the closest scope and add this scope to it.
-    const parent_block = this.queryParent(Block)
-    this.parent_block = parent_block
-
-    // Update declarations according to the statements we have in scope.
-    for (var s of this.statements) {
-      if (s instanceof Declaration)
-        this.declarations[s.name] = s
-    }
-
-
-  }
 }
 
 
@@ -119,6 +105,9 @@ export class PrimitiveType extends Expression {
   name!: Identifier
 }
 
+export class VarType extends PrimitiveType { }
+export class Dot3Type extends PrimitiveType { }
+
 export class FunctionCall extends Expression {
   lhs!: Expression
   args = [] as Expression[]
@@ -139,11 +128,17 @@ export class FunctionArgumentDefinition extends Expression {
 }
 
 
-export class FunctionDefinition extends Expression {
-  pub = false
+export class FunctionPrototype extends Expression {
   extern = false
+  ident: Opt<Identifier>
   args = [] as FunctionArgumentDefinition[]
   return_type: Opt<Expression>
+}
+
+
+export class FunctionDefinition extends Expression {
+  pub = false
+  proto!: FunctionPrototype
   block: Opt<Block>
 }
 
@@ -283,4 +278,9 @@ export class ArrayAccessOp extends BinOpExpression {
 
 export class ReturnExpression extends Expression {
   exp: Opt<Expression>
+}
+
+export class TestDeclaration extends ZigNode {
+  name!: StringLiteral
+  block!: Block
 }
