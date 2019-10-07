@@ -166,6 +166,8 @@ export class Rule<T> {
     return this.map((a, st, end, input) => {
       if (a instanceof Node)
         require('./print').print_node(a)
+      else
+        console.log(a)
       console.log(st.input_position, input.slice(end.input_position + 1, end.input_position + 5).map(e => e.str))
       return a
     })
@@ -608,7 +610,7 @@ export class Node {
       v.parent = this
     } else if (Array.isArray(v)) {
       for (var _v of v) {
-        if (!(_v instanceof Node)) break
+        if (!(_v instanceof Node)) continue
         this.children.push(_v)
         _v.parent = this
       }
