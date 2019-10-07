@@ -27,8 +27,19 @@ function show_node(n: Node, indent = '', prefix = '') {
   for (var c of n.children) {
     var p = ''
     for (var x in n) {
-      if ((n as any)[x] === c)
+      var val = (n as any)[x]
+      if (Array.isArray(val)) {
+        for (var i = 0; i < val.length; i++) {
+          if (val[i] === c) {
+            p = ch.magenta(`${x}[${i}]: `)
+            break
+          }
+        }
+      }
+      else if (val === c) {
         p = ch.magenta(x) + ': '
+        break
+      }
     }
     show_node(c, indent + '  ', p)
   }
