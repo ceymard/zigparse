@@ -1,5 +1,5 @@
 
-import { SeqObj, Opt, Either, Token, S, ZeroOrMore, Node, RawRule, SeparatedBy, Rule, Options, any, Lexeme, AnythingBut, Peek, OptSeparatedBy } from './libparse'
+import { SeqObj, Opt, Either, Token, S, ZeroOrMore, Node, RawRule, SeparatedBy, Rule, Options, any, Lexeme, AnythingBut, Peek, OptSeparatedBy, Not } from './libparse'
 import * as a from './ast'
 
 
@@ -580,12 +580,8 @@ export const SWITCH_PRONG = SeqObj({
 /////////////////////////////////////////
 export const SWITCH_EXPRESSION = SeqObj({
   _1:        'switch',
-  _2:         '(',
-  exp:        EXPRESSION,
-  _3:         ')',
-  _4:         '{',
-  stmts:      SeparatedBy(',', SWITCH_PRONG),
-  _5:         '}',
+  exp:        S`( ${EXPRESSION} )`,
+  stmts:      S`{ ${SeparatedBy(',', SWITCH_PRONG)} }`,
 })
 .map(n => new Node())
 
@@ -642,10 +638,9 @@ export const CONTAINER_DECL = SeqObj({
             opt_enum: Opt(S`( ${EXPRESSION} )`) // missing union (enum) FIXME
     }).map(r => new a.UnionDeclaration().set('opt_enum', r.opt_enum))
   ),
-  _1: '{',
-  members: () => CONTAINER_MEMBERS,
-  _2: '}',
-}).map(r => (r.kind as a.ContainerDeclaration)
+  members: S`{ ${() => CONTAINER_MEMBERS} }`,
+})
+.map(r => (r.kind as a.ContainerDeclaration)
   .set('members', r.members)
   .set('packed', !!r.qualifiers.kw_packed)
   .set('extern', !!r.qualifiers.kw_extern)
@@ -660,7 +655,7 @@ export const CONTAINER_MEMBERS: Rule<a.Declaration[]> = ZeroOrMore(Either(
   USINGNAMESPACE,
   OLD_FUNCTION_DECLARATION,
   CONTAINER_FIELD,
-  any, // will advance if we can't recognize an expression, so that the parser doesn't choke on invalid declarations.
+  S`${Not('}')} ${any}`, // will advance if we can't recognize an expression, so that the parser doesn't choke on invalid declarations.
 )).map(res => res.filter(r => !(r instanceof Lexeme)))
 
 

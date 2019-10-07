@@ -164,7 +164,9 @@ export class Rule<T> {
 
   get debug() {
     return this.map((a, st, end, input) => {
-      console.log(a, st.input_position)
+      if (a instanceof Node)
+        require('./print').print_node(a)
+      console.log(st.input_position, input.slice(end.input_position + 1, end.input_position + 5).map(e => e.str))
       return a
     })
   }
@@ -230,15 +232,25 @@ export function mkRules<R extends RawRule<any>[]>(rules: R): GenericRule<R> {
 
 export function Token(r: RegExp | string) {
   const re_test = r instanceof RegExp ? new RegExp(
-    (r.source[0] !== '^' ? '^' : '') + r.source + (r.source[r.source.length - 1] !== '$' ? '$' : '')
+    (r.source[0] !== '^' ? '^(?:' : '') + r.source + (r.source[r.source.length - 1] !== '$' ? ')$' : '')
      , r.flags) : null
   return new Rule((pos, input) => {
     var lexeme = input[pos]
-    if (!lexeme) return null
-    if (lexeme.is(r) || re_test && lexeme.str.match(re_test)) {
+    if (lexeme == null) return null
+    if (lexeme.is(r) || re_test && re_test.exec(lexeme.str)) {
       return [pos + 1, lexeme]
     }
     return null
+  })
+}
+
+
+export function Not(r: RawRule<any>) {
+  var rule = mkRule(r)
+  return new Rule((pos, input) => {
+    if (rule.tryParse(pos, input))
+      return null
+    return [pos, input]
   })
 }
 
@@ -408,7 +420,6 @@ export function ZeroOrMore<T>(_r: RawRule<T>): Rule<T[]> {
 export function Opt<T extends RawRule<any>>(_r: T): Rule<Result<T> | null> {
   const rule = mkRule(_r) as any
   return new Rule((pos, input) => {
-    if (pos >= input.length) return null // even Opt fails at the end of input !
     const p = rule.tryParse(pos, input)
     if (p) return p
     else return [pos, null]
