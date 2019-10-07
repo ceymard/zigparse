@@ -277,7 +277,8 @@ const BinOp = (op: RawRule<any>, exp: Rule<a.Expression>) => SeqObj({
     res = new a.BinOpExpression()
       .set('operator', r.op)
       .set('lhs', res)
-      .set('rhs', r.exp)
+    if (r.exp)
+      (res as a.BinOpExpression).set('rhs', r.exp)
   }
   return res
 })
@@ -294,7 +295,7 @@ export const BITWISE_EXPRESSION = BinOp(
   // and overloading it.
   Either(
     Operator(/&|\^|\||orelse/),
-    S`catch ${Opt(PAYLOAD)}`.map(c => new a.CatchOperator().set('payload', c))
+    S`${Token('catch').map(c => new a.CatchOperator())} ${Opt(PAYLOADED_EXPRESSION)}`.map(([op, exp]) => new a.BinOpExpression().set('rhs', exp).set('operator', op))
   ), BITSHIFT_EXPRESSION
 )
 export const COMPARE_EXPRESSION = BinOp(Operator(/==|!=|<=|>=|<|>/), BITWISE_EXPRESSION)

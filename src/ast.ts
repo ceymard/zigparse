@@ -270,8 +270,6 @@ export class PayloadedExpression extends Expression {
 
 export class CatchOperator extends Operator {
   value = 'catch'
-  payload: Opt<Payload>
-
 }
 
 // exp . ident
