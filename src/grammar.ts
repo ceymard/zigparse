@@ -158,6 +158,11 @@ export const PAYLOAD = SeqObj({
   .set('index', p.opt_index)
 )
 
+export const PAYLOADED_EXPRESSION = SeqObj({
+  payload:        Opt(PAYLOAD),
+  exp:            () => EXPRESSION
+}).map(r => r.payload ? r.payload.set('child_expression', r.exp) : r.exp)
+
 
 //////////////////////////////////////
 export const WHILE_PREFIX = SeqObj({})
@@ -185,34 +190,42 @@ export const IF_ELSE_EXPRESSION = SeqObj({
   exp:          () => ASSIGN_EXPRESSION,
   opt_payload:  Opt(PAYLOAD),
   then:         () => ASSIGN_EXPRESSION,
-  opt_else:     SeqObj({
+  opt_else:     Opt(SeqObj({
                   kw_else:      'else',
                   opt_payload:  Opt(PAYLOAD),
                   exp:          () => EXPRESSION,
-                })
+                }).map(r => r.opt_payload ? r.opt_payload
+                  .set('child_expression', r.exp)
+                  : r.exp
+                ))
 })
-.map(i => new a.Expression()) // FIXME !
+.map(r => new a.IfThenElseExpression()
+  .set('then', r.opt_payload ? r.opt_payload.set('child_expression', r.then) : r.then)
+  .set('else', r.opt_else)
+) // FIXME !
 
 
 ///////////////////////////////////////
 export const LOOP_EXPRESSION = SeqObj({
   label:          Opt(BLOCK_LABEL),
   inline:         Opt('inline'),
-  kw:             Either('for', 'while'),
-  _:              '(',
-  loop_exp:       () => ASSIGN_EXPRESSION,
-  _2:             ')',
+  kind:           Either(
+                    Token('for').map(t => new a.ForExpression()),
+                    Token('while').map(t => new a.WhileExpression()),
+                  ),
+  loop_exp:       S`( ${() => ASSIGN_EXPRESSION} )`,
   opt_payload:    Opt(PAYLOAD),
   continue_exp:   Opt(S`: ( ${() => ASSIGN_EXPRESSION} )`),
   body:           () => EXPRESSION,
-  opt_else:       Opt(SeqObj({
-                    kw_else:        'else',
-                    opt_payload:    Opt(PAYLOAD),
-                    statement:      Opt(() => STATEMENT),
-                  })),
+  opt_else:       S`else ${PAYLOADED_EXPRESSION}`,
   opt_semi:       Opt(';')
 })
-.map(r => new a.Expression())
+.map(r => (r.kind as a.LoopExpression)
+  .set('label', r.label)
+  .set('continue', r.continue_exp)
+  .set('body', r.opt_payload ? r.opt_payload.set('child_expression', r.body) : r.body)
+  .set('else', r.opt_else)
+)
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -574,11 +587,10 @@ export const SWITCH_PRONG = SeqObj({
                 })
               ),
   tk:         '=>',
-  payload:    Opt(PAYLOAD),
-  exp:        EXPRESSION
+  exp:        PAYLOADED_EXPRESSION
 })
 .map(n => new a.SwitchExpressionProng()
-
+  .set('exp', n.exp)
 )
 
 

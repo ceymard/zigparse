@@ -245,7 +245,6 @@ export class PayloadedExpression extends Expression {
   is_pointer = false
   name!: Identifier
   index: Opt<Identifier>
-  parent_expression!: Expression
   child_expression!: Expression
 
   // FIXME it should check what kind of parent it has to know
@@ -318,10 +317,28 @@ export class ErrorSet extends Expression {
 }
 
 export class SwitchExpressionProng extends Expression {
-
+  exp!: Expression
 }
 
 export class SwitchExpression extends Expression {
   exp!: Expression
   prongs = [] as SwitchExpressionProng[]
 }
+
+export class IfThenElseExpression extends Expression {
+  then!: Expression
+  else: Opt<Expression>
+}
+
+
+export class LoopExpression extends Expression {
+  label: Opt<Identifier>
+  loop!: Expression
+  continue: Opt<Expression>
+  body!: Expression
+  else!: Expression
+}
+
+export class WhileExpression extends Expression { }
+
+export class ForExpression extends Expression { }
