@@ -324,6 +324,7 @@ export class SwitchExpression extends Expression {
 }
 
 export class IfThenElseExpression extends Expression {
+  condition!: Expression
   then!: Expression
   else: Opt<Expression>
 }

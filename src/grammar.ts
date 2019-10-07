@@ -164,17 +164,6 @@ export const PAYLOADED_EXPRESSION = SeqObj({
 }).map(r => r.payload ? r.payload.set('child_expression', r.exp) : r.exp)
 
 
-//////////////////////////////////////
-export const WHILE_PREFIX = SeqObj({})
-
-
-/////////////////////////////////
-export const IF_PREFIX = SeqObj({
-  if:           'if',
-  exp:          () => ASSIGN_EXPRESSION,
-  opt_payload:  Opt(PAYLOAD),
-})
-
 
 ///////////////////////////////////////////
 export const COMPTIME_EXPRESSION = SeqObj({
@@ -187,9 +176,9 @@ export const COMPTIME_EXPRESSION = SeqObj({
 //////////////////////////////////////////
 export const IF_ELSE_EXPRESSION = SeqObj({
   if:           'if',
-  exp:          () => ASSIGN_EXPRESSION,
+  exp:          S`( ${() => EXPRESSION} )`,
   opt_payload:  Opt(PAYLOAD),
-  then:         () => ASSIGN_EXPRESSION,
+  then:         () => EXPRESSION,
   opt_else:     Opt(SeqObj({
                   kw_else:      'else',
                   opt_payload:  Opt(PAYLOAD),
@@ -200,6 +189,7 @@ export const IF_ELSE_EXPRESSION = SeqObj({
                 ))
 })
 .map(r => new a.IfThenElseExpression()
+  .set('condition', r.exp)
   .set('then', r.opt_payload ? r.opt_payload.set('child_expression', r.then) : r.then)
   .set('else', r.opt_else)
 ) // FIXME !
@@ -252,8 +242,8 @@ export const CURLY_SUFFIX_EXPRESSION = SeqObj({
 
 /////////////////////////////////////////
 export const PRIMARY_EXPRESSION = Either(
-  S`return ${() => EXPRESSION}`.map(e => new a.ReturnExpression().set('exp', e)),
   IF_ELSE_EXPRESSION,
+  S`return ${() => EXPRESSION}`.map(e => new a.ReturnExpression().set('exp', e)),
   COMPTIME_EXPRESSION,
   LOOP_EXPRESSION,
   CURLY_SUFFIX_EXPRESSION,
@@ -352,7 +342,7 @@ export const PRIMARY_TYPE_EXPRESSION: Rule<a.Expression> = Either(
   () => IF_ELSE_EXPRESSION,
   () => FUNCTION_PROTOTYPE,
   LOOP_EXPRESSION,
-  SeqObj({pe: Peek(`: ${IDENT}`), blk: () => BLOCK}).map(a => a.blk),
+  () => BLOCK,
   IDENT,
 )
 
@@ -609,15 +599,15 @@ export const SWITCH_EXPRESSION = SeqObj({
 
 ////////////////////////////////
 export const STATEMENT: Rule<Node> = Either(
-    VARIABLE_DECLARATION,
-    COMPTIME_BLOCK,
-    DEFER_STATEMENT,
-    IF_ELSE_EXPRESSION,
-    DEFER_STATEMENT,
-    LOOP_EXPRESSION,
-    SWITCH_EXPRESSION,
-    ASSIGN_EXPRESSION,
-    ';'
+  IF_ELSE_EXPRESSION,
+  VARIABLE_DECLARATION,
+  COMPTIME_BLOCK,
+  DEFER_STATEMENT,
+  DEFER_STATEMENT,
+  LOOP_EXPRESSION,
+  SWITCH_EXPRESSION,
+  ASSIGN_EXPRESSION,
+  ';'
 )
 
 
