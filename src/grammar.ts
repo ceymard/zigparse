@@ -217,8 +217,10 @@ export const LOOP_EXPRESSION = SeqObj({
 export const INIT_LIST = SeqObj({
   _st:      '{',
   lst:      Opt(Either(
-              separated_by(',', () => EXPRESSION),
-              separated_by(',', S`. ${IDENT} = ${() => EXPRESSION}`),
+              separated_by(',', () => EXPRESSION)
+                .map(r => new a.ArrayInitialization().set('init_list', r)  as a.CurlySuffixExpr),
+              separated_by(',', S`. ${IDENT} = ${() => EXPRESSION}`.map(([id, exp]) => [id, exp] as [a.Identifier, a.Expression]))
+                .map(r => new a.TypeInstanciation().set('init_list', r) as a.CurlySuffixExpr)
             )),
   _end:     '}',
 })
@@ -229,7 +231,7 @@ export const INIT_LIST = SeqObj({
 export const CURLY_SUFFIX_EXPRESSION = SeqObj({
   type:       () => TYPE_EXPRESSION,
   lst:        Opt(INIT_LIST)
-}).map(e => e.type)
+}).map(e => e.lst ? e.lst.set('type', e.type) : e.type)
 
 
 /////////////////////////////////////////
@@ -495,7 +497,7 @@ export const FUNCTION_PROTOTYPE = SeqObj({
   bytealign:    Opt(BYTE_ALIGN),
   link:         Opt(LINK_SECTION),
   anyerror:     Opt('!'),
-  return_type:  Either(VAR, EXPRESSION),
+  return_type:  Either(VAR, PRIMARY_TYPE_EXPRESSION),
 })
 .map(res => new a.FunctionPrototype()
   .set('args', res.args)

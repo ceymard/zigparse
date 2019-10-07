@@ -284,3 +284,17 @@ export class TestDeclaration extends ZigNode {
   name!: StringLiteral
   block!: Block
 }
+
+
+export class CurlySuffixExpr extends Expression {
+  type!: Expression
+}
+
+export class TypeInstanciation extends CurlySuffixExpr {
+  init_list: [Identifier, Expression][] = []
+}
+
+
+export class ArrayInitialization extends CurlySuffixExpr {
+  init_list = [] as Expression[]
+}
