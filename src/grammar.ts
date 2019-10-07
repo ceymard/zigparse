@@ -152,7 +152,7 @@ export const PAYLOAD = SeqObj({
   opt_index:  Opt(S`. ${IDENT}`),
   _e:         '|',
 })
-.map(p => new a.Payload()
+.map(p => new a.PayloadedExpression()
   .set('is_pointer', p.opt_ptr)
   .set('name', p.ident)
   .set('index', p.opt_index)
@@ -181,8 +181,10 @@ export const COMPTIME_EXPRESSION = SeqObj({
 
 //////////////////////////////////////////
 export const IF_ELSE_EXPRESSION = SeqObj({
-  prefix:       IF_PREFIX,
+  if:           'if',
   exp:          () => ASSIGN_EXPRESSION,
+  opt_payload:  Opt(PAYLOAD),
+  then:         () => ASSIGN_EXPRESSION,
   opt_else:     SeqObj({
                   kw_else:      'else',
                   opt_payload:  Opt(PAYLOAD),
@@ -320,6 +322,7 @@ export const PRIMARY_TYPE_EXPRESSION: Rule<a.Expression> = Either(
   Token(T.STR).map(n => new a.StringLiteral().set('value', n.str)),
   // parenthesized expression
   S`( ${() => PRIMARY_TYPE_EXPRESSION} )`,
+  S`error { ${SeparatedBy(',', IDENT)} }`.map(idents => new a.ErrorSet().set('idents', idents)),
   // function call
   SeqObj({
     ident:    Token(T.BUILTIN_IDENT),
@@ -574,7 +577,9 @@ export const SWITCH_PRONG = SeqObj({
   payload:    Opt(PAYLOAD),
   exp:        EXPRESSION
 })
-.map(n => new Node())
+.map(n => new a.SwitchExpressionProng()
+
+)
 
 
 /////////////////////////////////////////
@@ -583,7 +588,10 @@ export const SWITCH_EXPRESSION = SeqObj({
   exp:        S`( ${EXPRESSION} )`,
   stmts:      S`{ ${SeparatedBy(',', SWITCH_PRONG)} }`,
 })
-.map(n => new Node())
+.map(r => new a.SwitchExpression()
+  .set('exp', r.exp)
+  .set('prongs', r.stmts)
+)
 
 
 ////////////////////////////////

@@ -241,30 +241,38 @@ export class BinOpExpression extends Expression {
   lhs: Opt<Expression>
 }
 
-export class Payload extends ZigNode {
+export class PayloadedExpression extends Expression {
   is_pointer = false
   name!: Identifier
   index: Opt<Identifier>
+  parent_expression!: Expression
+  child_expression!: Expression
+
+  // FIXME it should check what kind of parent it has to know
+  // what expression it is related to.
+
+  getAvailableNames() {
+    var names = {} as {[name: string]: ZigNode}
+    return names
+    // if (this.payload) {
+
+    //   // More like this should be a variable declaration
+    //   // whose value is @typeInfo(original_exp).ErrorUnion.error_set
+    //   names[this.payload.name.value] = this.payload.name
+
+    //   throw 'not implemented'
+    //   // throw 'not implemented'
+    //   // names[this.payload.exp]
+    // }
+    // return Object.assign({}, this.parent.getAvailableNames(), names)
+  }
+
 }
 
 export class CatchOperator extends Operator {
   value = 'catch'
   payload: Opt<Payload>
 
-  getAvailableNames() {
-    var names = {} as {[name: string]: ZigNode}
-    if (this.payload) {
-
-      // More like this should be a variable declaration
-      // whose value is @typeInfo(original_exp).ErrorUnion.error_set
-      names[this.payload.name.value] = this.payload.name
-
-      throw 'not implemented'
-      // throw 'not implemented'
-      // names[this.payload.exp]
-    }
-    return Object.assign({}, this.parent.getAvailableNames(), names)
-  }
 }
 
 // exp . ident
@@ -303,4 +311,17 @@ export class TypeInstanciation extends CurlySuffixExpr {
 
 export class ArrayInitialization extends CurlySuffixExpr {
   init_list = [] as Expression[]
+}
+
+export class ErrorSet extends Expression {
+  idents = [] as Identifier[]
+}
+
+export class SwitchExpressionProng extends Expression {
+
+}
+
+export class SwitchExpression extends Expression {
+  exp!: Expression
+  prongs = [] as SwitchExpressionProng[]
 }
