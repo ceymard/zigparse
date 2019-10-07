@@ -516,6 +516,7 @@ export const FUNCTION_PROTOTYPE = SeqObj({
 
 
 export const OLD_FUNCTION_DECLARATION = SeqObj({
+  pub:        Opt('pub'),
   proto:      FUNCTION_PROTOTYPE,
   blk:        Either(() => BLOCK, Opt(';').map(r => null))
 })
