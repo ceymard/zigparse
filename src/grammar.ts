@@ -8,8 +8,8 @@ export const T = {
   BLOCK_COMMENT: /([ \t]*\/\/\/[^\n]*\n)+/m,
   STR: /c?"(\\"|.)*"|\\\\[^\n]*\n(\s*\\\\[^\n]*\n)*/,
   CHAR: /'(\\'|.)*'/,
-  FLOAT: /\d+.\d+/, // fixme
-  INTEGER: /\d+/, // fixme
+  INTEGER: /0b[0-1]+|0o[0-8]+|0x[\da-z]+|\d+/i, // fixme
+  FLOAT: /\d+(\.\d+)?(e\+\d+|p\-\d+)?|0x[\da-z]+(\.[\da-z]+)?(e\+[\da-z]+|p\-[\da-z]+)?/i, // fixme
   IDENT: /[A-Za-z_]\w*|@"[^"]+"/,
   OP: new RegExp([
     /&=|&/,
@@ -330,8 +330,8 @@ export const PRIMARY_TYPE_EXPRESSION: Rule<a.Expression> = Either(
   Token('promise').map(() => new a.Promise),
   Token('unreachable').map(() => new a.Unreachable),
   Token(T.CHAR).map(n => new a.CharLiteral().set('value', n.str)),
-  Token(T.FLOAT).map(n => new a.FloatLiteral().set('value', n.str)),
   Token(T.INTEGER).map(n => new a.IntegerLiteral().set('value', n.str)),
+  Token(T.FLOAT).map(n => new a.FloatLiteral().set('value', n.str)),
   Token(T.CHAR).map(n => new a.CharLiteral().set('value', n.str)),
   Token(T.STR).map(n => new a.StringLiteral().set('value', n.str)),
   // parenthesized expression
