@@ -3,7 +3,9 @@ import { Node } from './libparse'
 import * as a from './ast'
 
 export function print_node(n: Node, indent = '', prefix = '') {
-  var suppl = [] as string[]
+  var suppl =
+    [] as string[]
+    // [n.range ? ch.grey('' + n.range[0].offset) : ''] as string[]
   if (n instanceof a.Identifier)
     suppl.push(ch.green(n.value))
   else if (n instanceof a.Literal)

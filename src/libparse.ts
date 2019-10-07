@@ -616,20 +616,6 @@ export class Node {
       }
     }
 
-    // Keep the children sorted.
-    this.children.sort((a, b) => {
-      var a1 = a.range[0].offset
-      var b1 = b.range[0].offset
-      return a1 > b1 ? 1 : a1 < b1 ? -1 : 0
-    })
-
-    if (!this.range && this.children.length) {
-      this.range = [
-        this.children[0].range[0],
-        this.children[this.children.length - 1].range[1]
-      ]
-    }
-
     return this
   }
 
@@ -637,6 +623,21 @@ export class Node {
     // children speak first.
     for (var c of this.children)
       c._onParsed()
+
+    // Keep the children sorted.
+    this.children.sort((a, b) => {
+      var a1 = a.range[0].offset
+      var b1 = b.range[0].offset
+      return a1 > b1 ? 1 : a1 < b1 ? -1 : 0
+    })
+
+    if (this.children.length && (!this.range || this.range[0].offset > this.children[0].range[0].offset)) {
+      this.range = [
+        this.children[0].range[0],
+        this.children[this.children.length - 1].range[1]
+      ]
+    }
+
     this.onParsed()
   }
 
