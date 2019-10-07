@@ -544,8 +544,8 @@ export function first<A>(a: [A, ...any[]]) { return a[0] }
 export function second<A>(a: [any, A, ...any[]]) { return a[1] }
 export function third<A>(a: [any, any, A, ...any[]]) { return a[2] }
 
-export const separated_by = <T>(separator: RawRule<any>, rule: RawRule<T>) =>
-  Opt(SeqObj({
+export const SeparatedBy = <T>(separator: RawRule<any>, rule: RawRule<T>) =>
+  SeqObj({
     rule: rule as Rule<T>,
     more: ZeroOrMore(
       SeqObj({sep: separator, rule}).map(({rule}) => {
@@ -553,7 +553,10 @@ export const separated_by = <T>(separator: RawRule<any>, rule: RawRule<T>) =>
       })
     ),
     opt_end: Opt(separator)
-  }).map(({rule, more}) => [rule, ...more])).map(v => v || [])
+  }).map(({rule, more}) => [rule, ...more])
+
+export const OptSeparatedBy = <T>(separator: RawRule<any>, rule: RawRule<T>) =>
+  Opt(SeparatedBy(separator, rule)).map(r => r || [])
 
 
 export function Forward<T>(fn: () => RawRule<T>): Rule<T> {

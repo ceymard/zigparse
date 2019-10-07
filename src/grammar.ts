@@ -1,5 +1,5 @@
 
-import { SeqObj, Opt, Either, Token, S, ZeroOrMore, Node, RawRule, separated_by, Rule, Options, any, Lexeme, AnythingBut, Peek } from './libparse'
+import { SeqObj, Opt, Either, Token, S, ZeroOrMore, Node, RawRule, SeparatedBy, Rule, Options, any, Lexeme, AnythingBut, Peek, OptSeparatedBy } from './libparse'
 import * as a from './ast'
 
 
@@ -217,12 +217,13 @@ export const LOOP_EXPRESSION = SeqObj({
 export const INIT_LIST = SeqObj({
   _st:      '{',
   lst:      Opt(Either(
-              separated_by(',', () => EXPRESSION)
+              SeparatedBy(',', S`. ${IDENT} = ${() => EXPRESSION}`
+                .map(([id, exp]) => new a.TypeInstanciationField().set('ident', id).set('value', exp)))
+                .map(r => new a.TypeInstanciation().set('init_list', r) as a.CurlySuffixExpr),
+              SeparatedBy(',', () => EXPRESSION)
                 .map(r => new a.ArrayInitialization().set('init_list', r)  as a.CurlySuffixExpr),
-              separated_by(',', S`. ${IDENT} = ${() => EXPRESSION}`.map(([id, exp]) => [id, exp] as [a.Identifier, a.Expression]))
-                .map(r => new a.TypeInstanciation().set('init_list', r) as a.CurlySuffixExpr)
             )),
-  _end:     '}',
+  _end:     Token('}'),
 })
 .map(r => r.lst)
 
@@ -481,7 +482,7 @@ export const FUNCTION_ARGUMENT = SeqObj({
 
 
 /////////////////////////////////////////////////////////////////////////////
-export const FUNCTION_CALL_ARGUMENTS = S`( ${separated_by(',', EXPRESSION)} )`
+export const FUNCTION_CALL_ARGUMENTS = S`( ${OptSeparatedBy(',', EXPRESSION)} )`
 
 
 //////////////////////////////////////////
@@ -493,7 +494,7 @@ export const FUNCTION_PROTOTYPE = SeqObj({
   opt_kw_inline,
   _1:           'fn',
   ident:        Opt(IDENT),
-  args:         S`( ${separated_by(',', FUNCTION_ARGUMENT)} )`,
+  args:         S`( ${OptSeparatedBy(',', FUNCTION_ARGUMENT)} )`,
   bytealign:    Opt(BYTE_ALIGN),
   link:         Opt(LINK_SECTION),
   anyerror:     Opt('!'),
@@ -561,7 +562,7 @@ export const SWITCH_PRONG = SeqObj({
   case:       Either(
                 'else',
                 SeqObj({
-                  lst: separated_by(',', SeqObj({
+                  lst: SeparatedBy(',', SeqObj({
                     item: SeqObj({
                       item: EXPRESSION,
                       opt:  Opt(S`... ${EXPRESSION}`),
@@ -583,7 +584,7 @@ export const SWITCH_EXPRESSION = SeqObj({
   exp:        EXPRESSION,
   _3:         ')',
   _4:         '{',
-  stmts:      separated_by(',', SWITCH_PRONG),
+  stmts:      SeparatedBy(',', SWITCH_PRONG),
   _5:         '}',
 })
 .map(n => new Node())

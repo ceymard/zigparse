@@ -290,8 +290,14 @@ export class CurlySuffixExpr extends Expression {
   type!: Expression
 }
 
+// We should make ident and value optional here to allow for auto complete
+export class TypeInstanciationField extends ZigNode {
+  ident!: Identifier
+  value!: Expression
+}
+
 export class TypeInstanciation extends CurlySuffixExpr {
-  init_list: [Identifier, Expression][] = []
+  init_list: TypeInstanciationField[] = []
 }
 
 
