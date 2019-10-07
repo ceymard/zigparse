@@ -555,7 +555,7 @@ export const BLOCK = SeqObj({
 })
 .map(({statements}) =>
   new a.Block()
-  .set('statements', statements)
+  .set('statements', statements as a.ZigNode[])
 )
 
 

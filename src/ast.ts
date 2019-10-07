@@ -55,7 +55,7 @@ export class Block extends Expression {
   label: Opt<string>
 
   declarations: {[name: string]: Declaration} = {}
-  statements: Node[] = []
+  statements: ZigNode[] = []
   import_namespaces: UsingNamespace[] = []
 
   // used when the block is asked what type it is...
