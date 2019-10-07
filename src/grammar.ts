@@ -1,7 +1,6 @@
 
-import { SeqObj, Opt, Either, Token, S, ZeroOrMore, Node, RawRule, SeparatedBy, Rule, Options, any, Lexeme, AnythingBut, Peek, OptSeparatedBy, Not } from './libparse'
+import { SeqObj, Opt, Either, Token, S, ZeroOrMore, Node, RawRule, SeparatedBy, Rule, Options, any, Lexeme, AnythingBut, OptSeparatedBy, Not } from './libparse'
 import * as a from './ast'
-
 
 export const T = {
   BUILTIN_IDENT: /@[A-Za-z_][A-Za-z_0-9]*/,
@@ -73,7 +72,8 @@ export const DOC = Opt(Token(T.BLOCK_COMMENT).map(t => t.str))
 
 
 ///////////////////////////////////
-export const IDENT = Token(T.IDENT).map(n => new a.Identifier().set('value', n.str))
+export const IDENT = S`${Not(/align|and|allowzero|asm|async|await|break|catch|comptime|const|continue|defer|else|enum|errdefer|error|export|extern|false|fn|for|if|inline|nakedcc|noalias|null|or|orelse|packed|promise|pub|resume|return|linksection|stdcallcc|struct|suspend|switch|test|threadlocal|true|try|undefined|union|unreachable|usingnamespace|var|volatile|while/)} ${Token(T.IDENT)}`.map(([_, n]) => new a.Identifier().set('value', n.str))
+
 
 
 ///////////////////////////////
@@ -338,10 +338,10 @@ export const PRIMARY_TYPE_EXPRESSION: Rule<a.Expression> = Either(
   S`. ${IDENT}`.map(n => new a.LeadingDotAccess().set('name', n)),
   // error
   S`error . ${IDENT}`.map(n => new a.ErrorField().set('name', n)),
+  LOOP_EXPRESSION,
   () => SWITCH_EXPRESSION,
   () => IF_ELSE_EXPRESSION,
   () => FUNCTION_PROTOTYPE,
-  LOOP_EXPRESSION,
   () => BLOCK,
   IDENT,
 )
@@ -499,7 +499,7 @@ export const FUNCTION_PROTOTYPE = SeqObj({
   OPT_EXTERN,
   opt_kw_threadlocal,
   opt_kw_inline,
-  _1:           'fn',
+  _1:           Token('fn'),
   ident:        Opt(IDENT),
   args:         S`( ${OptSeparatedBy(',', FUNCTION_ARGUMENT)} )`,
   bytealign:    Opt(BYTE_ALIGN),
@@ -666,7 +666,7 @@ export const CONTAINER_MEMBERS: Rule<a.Declaration[]> = ZeroOrMore(Either(
   USINGNAMESPACE,
   OLD_FUNCTION_DECLARATION,
   CONTAINER_FIELD,
-  S`${Not('}')} ${any}`, // will advance if we can't recognize an expression, so that the parser doesn't choke on invalid declarations.
+  S`${Not('}')} ${any}`.map(e => e[1]), // will advance if we can't recognize an expression, so that the parser doesn't choke on invalid declarations.
 )).map(res => res.filter(r => !(r instanceof Lexeme)))
 
 

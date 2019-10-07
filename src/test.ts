@@ -13,5 +13,6 @@ const res = ROOT.parse(input) as a.FileBlock
 res._onParsed()
 
 print_node(res)
+// console.log(res.statements[0])
 
 // console.log(f)
