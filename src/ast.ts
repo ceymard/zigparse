@@ -95,7 +95,9 @@ export class Literal extends Expression {
   value = ''
 }
 
-export class Identifier extends Literal { }
+export class Identifier extends Literal {
+  doc: Opt<string>
+}
 export class StringLiteral extends Literal { }
 export class CharLiteral extends Literal { }
 export class BooleanLiteral extends Literal { }
@@ -125,7 +127,7 @@ export class BuiltinFunctionCall extends Expression {
 
 export class FunctionArgumentDefinition extends Expression {
   comptime = false
-  name!: Identifier
+  name: Opt<Identifier>
   type!: Expression
 }
 
@@ -182,6 +184,7 @@ export class UnionDeclaration extends ContainerDeclaration {
 
 export class UsingNamespace extends Expression {
 
+  pub = false
   exp!: Expression
 
   onParsed() {
@@ -194,22 +197,37 @@ export class UsingNamespace extends Expression {
 }
 
 
+export type TypeModifiers = {
+  align?: Opt<Expression>
+  volatile?: Opt<boolean>
+  const?: Opt<boolean>
+  allowzero?: Opt<boolean>
+}
+
+
+export class PromiseType extends Expression {
+  rhs!: Expression
+}
+
 export class Optional extends Expression {
-  ref!: Expression
+  rhs!: Expression
 }
 
 export class Pointer extends Expression {
-  ref!: Expression
+  rhs!: Expression
+  kind!: string
+  modifiers!: TypeModifiers
 }
 
 export class Reference extends Expression {
-  ref!: Expression
+  rhs!: Expression
 }
 
 // ????
 export class ArrayOrSliceDeclaration extends Expression {
   number: Opt<Expression> // if _ then infer the nember of members, otherwise it is provided.
-  type!: Expression
+  rhs!: Expression
+  modifiers!: TypeModifiers
 }
 
 /**
@@ -346,3 +364,7 @@ export class LoopExpression extends Expression {
 export class WhileExpression extends Expression { }
 
 export class ForExpression extends Expression { }
+
+export class DeferStatement extends Expression {
+  exp!: Expression
+}

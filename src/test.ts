@@ -6,13 +6,16 @@ import { T, ROOT } from './grammar'
 import * as a from './ast'
 import { print_node } from './print'
 
-const f = fs.readFileSync(process.argv[2], 'utf-8')
-const l = new Lexer(Object.values(T))
-const input = l.feed(f)
-const res = ROOT.parse(input) as a.FileBlock
-res._onParsed()
+for (var filename of process.argv.slice(2)) {
+  console.log(`--> ${filename}`)
+  const f = fs.readFileSync(filename, 'utf-8')
+  const l = new Lexer(Object.values(T))
+  const input = l.feed(f)
+  const res = ROOT.parse(input) as a.FileBlock
+  res._onParsed()
+  if (false)
+    print_node(res)
+  // console.log(res.statements[0])
+  // console.log(f)
+}
 
-// print_node(res)
-// console.log(res.statements[0])
-
-// console.log(f)

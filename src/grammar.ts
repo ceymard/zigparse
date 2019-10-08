@@ -1,14 +1,14 @@
 
-import { SeqObj, Opt, Either, Token, S, ZeroOrMore, Node, RawRule, SeparatedBy, Rule, Options, any, Lexeme, AnythingBut, OptSeparatedBy, Not } from './libparse'
+import { SeqObj, Opt, Either, Token, S, ZeroOrMore, RawRule, SeparatedBy, Rule, Options, any, Lexeme, AnythingBut, OptSeparatedBy, Not } from './libparse'
 import * as a from './ast'
 
 export const T = {
   BUILTIN_IDENT: /@[A-Za-z_][A-Za-z_0-9]*/,
   BLOCK_COMMENT: /([ \t]*\/\/\/[^\n]*\n)+/m,
-  STR: /c?"(\\"|.)*"|\\\\[^\n]*\n(\s*\\\\[^\n]*\n)*/,
-  CHAR: /'(\\'|.)*'/,
+  STR: /c?"(\\\\|\\"|[^"])*"|\\\\[^\n]*\n(\s*\\\\[^\n]*\n)*/,
+  CHAR: /'(\\\\|\\'|[^'])*'/,
+  FLOAT: /\d+\.\d+(e[\+\-]\d+|p[\+\-]\d+)?|0x[\da-z]+\.[\da-z]+(e[\+\-][\da-z]+|p[\+\-][\da-z]+)?/i, // fixme
   INTEGER: /0b[0-1]+|0o[0-8]+|0x[\da-z]+|\d+/i, // fixme
-  FLOAT: /\d+(\.\d+)?(e\+\d+|p\-\d+)?|0x[\da-z]+(\.[\da-z]+)?(e\+[\da-z]+|p\-[\da-z]+)?/i, // fixme
   IDENT: /[A-Za-z_]\w*|@"[^"]+"/,
   OP: new RegExp([
     /&=|&/,
@@ -72,7 +72,7 @@ export const DOC = Opt(Token(T.BLOCK_COMMENT).map(t => t.str))
 
 
 ///////////////////////////////////
-export const IDENT = S`${Not(/align|and|allowzero|asm|async|await|break|catch|comptime|const|continue|defer|else|enum|errdefer|error|export|extern|false|fn|for|if|inline|nakedcc|noalias|null|or|orelse|packed|promise|pub|resume|return|linksection|stdcallcc|struct|suspend|switch|test|threadlocal|true|try|undefined|union|unreachable|usingnamespace|var|volatile|while/)} ${Token(T.IDENT)}`.map(([_, n]) => new a.Identifier().set('value', n.str))
+export const IDENT = S`${Not(/align|and|allowzero|asm|async|await|break|catch|comptime|const|continue|defer|else|enum|errdefer|error|export|extern|false|fn|for|if|inline|nakedcc|noalias|null|or|orelse|packed|promise|pub|resume|return|linksection|stdcallcc|struct|suspend|switch|test|threadlocal|true|try|undefined|union|unreachable|usingnamespace|var|volatile|while/)} ${Opt(DOC)} ${Token(T.IDENT)}`.map(([_, d, n]) => new a.Identifier().set('value', n.str).set('doc', d))
 
 
 
@@ -88,7 +88,7 @@ export const DOT3 = Token('...')
 
 ///////////////////////////////
 export const STR = Token(T.STR)
-.map(s => s.str.slice(1, -1))
+.map(s => new a.StringLiteral().set('value', s.str))
   // FIXME this is incorrect, since a string can be multiline \\
 
 
@@ -322,7 +322,7 @@ export const PRIMARY_TYPE_EXPRESSION: Rule<a.Expression> = Either(
   Token(T.STR).map(n => new a.StringLiteral().set('value', n.str)),
   // parenthesized expression
   S`( ${() => EXPRESSION} )`,
-  S`error { ${SeparatedBy(',', IDENT)} }`.map(idents => new a.ErrorSet().set('idents', idents)),
+  S`error { ${Opt(SeparatedBy(',', IDENT))} }`.map(idents => new a.ErrorSet().set('idents', idents || [])),
   // function call
   SeqObj({
     ident:    Token(T.BUILTIN_IDENT),
@@ -346,31 +346,40 @@ export const PRIMARY_TYPE_EXPRESSION: Rule<a.Expression> = Either(
 export const BYTE_ALIGN = S`align ( ${EXPRESSION} )`
 
 
+function reduce_unary<T extends a.Expression & {rhs: a.Expression}>(lst: T[], last: a.Expression) {
+  var res = last
+  for (var i = lst.length - 1; i > 0; i--) {
+    res = lst[i].set('rhs', res)
+  }
+  return res
+}
+
+
 export const TYPE_MODIFIER = Options({
   align: BYTE_ALIGN,
-  const: 'const',
-  volatile: 'volatile',
-  allowzero: 'allowzero'
+  const: Token('const').map(() => true),
+  volatile: Token('volatile').map(() => true),
+  allowzero: Token('allowzero').map(() => true),
 })
 
 ///
 export const PREFIX_TYPE_OP = Either(
   // make the type optional
-  '?',
+  Token('?').map(() => new a.Optional()),
   // a promise
-  S`promise ->`,
+  S`promise ->`.map(() => new a.PromiseType()),
   // declaration of an array type or a slice
   SeqObj({
     _1: '[',
     exp: Opt(EXPRESSION),
     _2: ']',
     modifiers: TYPE_MODIFIER
-  }),
+  }).map(s => new a.ArrayOrSliceDeclaration().set('number', s.exp).set('modifiers', s.modifiers)),
   // declaration of a pointer type
   SeqObj({
     ptrtype: Either('*', '**', '[*]', '[*c]'),
     modifiers: TYPE_MODIFIER
-  })
+  }).map(s => new a.Pointer().set('kind', s.ptrtype.str).set('modifiers', s.modifiers))
 )
 
 
@@ -378,9 +387,9 @@ export const SUFFIX_OPERATOR = Either(
   SeqObj({
     _1: '[',
     exp: EXPRESSION,
-    slice: Opt(S`.. ${EXPRESSION}`),
+    slice: Opt(S`.. ${Opt(EXPRESSION)}`),
     _2: ']'
-  }).map(e => new a.ArrayAccessOp().set('rhs', e.exp).set('slice', e.slice)), // FIXME this needs slice !
+  }).map(e => new a.ArrayAccessOp().set('rhs', e.exp).set('slice', e.slice)), // FIXME this needs slice and it's probably not correct since I don't capture ..
   SeqObj({op: Operator('.'), id: IDENT}).map(e => new a.DotBinOp().set('rhs', e.id).set('operator', e.op)),
   S`. *`.map(e => new a.DerefOp()),
   S`. ?`.map(e => new a.DeOpt()),
@@ -432,7 +441,7 @@ export const TYPE_EXPRESSION: Rule<a.Expression> = SeqObj({
   prefix: ZeroOrMore(PREFIX_TYPE_OP),
   error_union_expr: ERROR_UNION_EXPRESSION
 })
-.map(r => r.error_union_expr)
+.map(r => r.prefix ? reduce_unary(r.prefix, r.error_union_expr) : r.error_union_expr)
 
 
 ////////////////////////////////////////
@@ -456,7 +465,8 @@ export const CONTAINER_FIELD = SeqObj({
 export const VARIABLE_DECLARATION = SeqObj({
   doc:        DOC,
               opt_kw_export,
-  opt_extern: Opt(S`extern ${STR}`),
+  pub:        OptBool('pub'),
+  opt_extern: Opt(S`extern ${Opt(STR)}`),
               opt_kw_threadlocal,
               opt_kw_comptime,
               kw_const_var,
@@ -467,8 +477,10 @@ export const VARIABLE_DECLARATION = SeqObj({
   value:      Opt(S`= ${EXPRESSION}`),
   opt_semi:   Opt(';')
 })
-.map(({ident, opt_type, value}) =>
+.map(({ident, opt_type, value, pub, doc}) =>
   new a.VariableDeclaration()
+  .set('doc', doc)
+  .set('pub', pub)
   .set('name', ident)
   .set('type', opt_type)
   .set('value', value)
@@ -478,9 +490,11 @@ export const VARIABLE_DECLARATION = SeqObj({
 /////////////////////////////////////////
 export const FUNCTION_ARGUMENT = SeqObj({
   doc:      DOC,
-            opt_kw_comptime,
-  ident:    IDENT,
-            tk_colon,
+  opts:     Options({
+              comptime: 'comptime',
+              noalias: 'noalias'
+            }),
+  ident:    Opt(S`${IDENT} : `),
   type:     Either(TYPE_EXPRESSION, DOT3, VAR),
 })
 .map(r =>
@@ -497,10 +511,12 @@ export const FUNCTION_CALL_ARGUMENTS = S`( ${OptSeparatedBy(',', EXPRESSION)} )`
 //////////////////////////////////////////
 export const FUNCTION_PROTOTYPE = SeqObj({
   doc:          DOC,
-  opt_kw_fncc,
-  OPT_EXTERN,
-  opt_kw_threadlocal,
-  opt_kw_inline,
+  export:       Opt('export'),
+  pub:          Opt('pub'),
+  extern:       OPT_EXTERN,
+                opt_kw_fncc,
+                opt_kw_threadlocal,
+                opt_kw_inline,
   _1:           Token('fn'),
   ident:        Opt(IDENT),
   args:         S`( ${OptSeparatedBy(',', FUNCTION_ARGUMENT)} )`,
@@ -518,8 +534,6 @@ export const FUNCTION_PROTOTYPE = SeqObj({
 
 
 export const OLD_FUNCTION_DECLARATION = SeqObj({
-  doc:        DOC,
-  pub:        Opt('pub'),
   proto:      FUNCTION_PROTOTYPE,
   blk:        Either(() => BLOCK, Opt(';').map(r => null))
 })
@@ -565,7 +579,7 @@ export const COMPTIME_BLOCK = SeqObj({
 export const DEFER_STATEMENT = SeqObj({
   kw:         Either('defer', 'errdefer'),
   contents:   EXPRESSION,
-})
+}).map(r => new a.DeferStatement().set('exp', r.contents))
 
 
 ////////////////////////////////////
@@ -602,17 +616,15 @@ export const SWITCH_EXPRESSION = SeqObj({
 
 
 ////////////////////////////////
-export const STATEMENT: Rule<Node> = Either(
+export const STATEMENT: Rule<a.ZigNode> = S`${Either(
   IF_ELSE_EXPRESSION,
   VARIABLE_DECLARATION,
   COMPTIME_BLOCK,
   DEFER_STATEMENT,
-  DEFER_STATEMENT,
   LOOP_EXPRESSION,
   SWITCH_EXPRESSION,
   ASSIGN_EXPRESSION,
-  ';'
-)
+)} ${Opt(';')}`.map(r => r[0])
 
 
 ////////////////////////////////////////
@@ -630,11 +642,12 @@ export const TEST_DECLARATION = SeqObj({
 
 //////////////////////////////////////
 export const USINGNAMESPACE = SeqObj({
+  pub:    OptBool('pub'),
           kw_usingnamespace,
   exp:    EXPRESSION,
   semi:   Opt(tk_semicolon),
 })
-.map(n => new a.UsingNamespace().set('exp', n.exp)) // FIXME !
+.map(n => new a.UsingNamespace().set('exp', n.exp).set('pub', n.pub)) // FIXME !
 
 
 //////////////////////////////////////
@@ -650,7 +663,10 @@ export const CONTAINER_DECL = SeqObj({
     }).map(r => new a.StructDeclaration()),
     SeqObj({
             kw_union,
-            opt_enum: Opt(S`( ${EXPRESSION} )`) // missing union (enum) FIXME
+            opt_enum: Opt(S`( ${Either(
+              S`enum ${Opt(EXPRESSION)}`,
+              EXPRESSION
+            )} )`) // missing union (enum) FIXME
     }).map(r => new a.UnionDeclaration().set('opt_enum', r.opt_enum))
   ),
   members: S`{ ${() => CONTAINER_MEMBERS} }`,
@@ -664,15 +680,19 @@ export const CONTAINER_DECL = SeqObj({
 
 //////////////////////////////////////
 export const CONTAINER_MEMBERS: Rule<a.Declaration[]> = ZeroOrMore(Either(
-  VARIABLE_DECLARATION,
-  TEST_DECLARATION,
-  COMPTIME_BLOCK,
-  USINGNAMESPACE,
-  OLD_FUNCTION_DECLARATION,
-  CONTAINER_FIELD,
-  TEST_DECLARATION,
-  S`${Not('}')} ${any}`.map(e => e[1]).debug, // will advance if we can't recognize an expression, so that the parser doesn't choke on invalid declarations.
-)).map(res => res.filter(r => !(r instanceof Lexeme)))
+  S`${Either(
+    VARIABLE_DECLARATION,
+    TEST_DECLARATION,
+    COMPTIME_BLOCK,
+    USINGNAMESPACE,
+    OLD_FUNCTION_DECLARATION,
+    CONTAINER_FIELD,
+    TEST_DECLARATION,
+  )} ${Opt(';')}`.map(r => r[0]),
+  S`${Not('}')} ${any}`.map(e => e[1])
+    .map(e => null)
+  , // will advance if we can't recognize an expression, so that the parser doesn't choke on invalid declarations.
+)).map(res => res.filter(r => !!r))
 
 
 export const ROOT = CONTAINER_MEMBERS

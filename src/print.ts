@@ -1,6 +1,10 @@
 import ch from 'chalk'
-import { Node } from './libparse'
+import { Node, Lexeme } from './libparse'
 import * as a from './ast'
+
+export function print_lexeme(l: Lexeme) {
+  console.log(ch.bgBlueBright.bold.hex('#010133')(l.str) + ' ' + ch.greenBright.bold('' + l.line) + ':' + ch.greenBright('' + l.col))
+}
 
 export function print_node(n: Node, indent = '', prefix = '') {
   var suppl =
@@ -13,14 +17,14 @@ export function print_node(n: Node, indent = '', prefix = '') {
   else if (n instanceof a.Operator)
     suppl.push(ch.red(n.value))
   else if (n instanceof a.VariableDeclaration) {
-    var c = ch.bold
+    var co = ch.bold
     if (n.value instanceof a.ContainerDeclaration)
-      c = c.bgRedBright
+      co = co.bgRedBright
     else if (n.value instanceof a.FunctionDefinition)
-      c = c.bgGreenBright.black
+      co = co.bgGreenBright.black
     else
-      c = c.bgCyanBright.black
-    suppl.push(c(n.name.value))
+      co = co.bgCyanBright.black
+    suppl.push(co(n.name.value))
   }
 
   console.log(indent + prefix + n.constructor.name + (suppl.length ? '(' + suppl.join(', ') + ')' : ''))

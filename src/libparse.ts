@@ -74,7 +74,7 @@ export class Lexer {
     var res: Lexeme[] = []
     var skip = this.skip
 
-    const lines = (s: string): [number, number] => {
+    const lines = (s: string): void => {
       var len = s.length
       for (var i = 0; i < len; i++) {
         col++
@@ -115,7 +115,7 @@ export class Lexer {
         ))
       }
       idx += m[0].length
-      var lin = lines(m[0])
+      lines(m[0])
     }
 
     if (idx < str.length) {
@@ -161,9 +161,11 @@ export class Rule<T> {
     return this.map((a, st, end, input) => {
       if (a instanceof Node)
         require('./print').print_node(a)
+      else if (a instanceof Lexeme)
+        require('./print').print_lexeme(a)
       else
         console.log(a)
-      console.log(st.input_position, input.slice(end.input_position + 1, end.input_position + 5).map(e => e.str))
+      // console.log(st.input_position, input.slice(end.input_position + 1, end.input_position + 5).map(e => e.str))
       return a
     })
   }
@@ -361,15 +363,17 @@ export function Options<T extends {[name: string]: RawRule<any>}>(_rules: T): Ru
     var res = {} as any
     var p: ParseResult<any>
     while (true) {
+      var found = false
       for (var i = 0; i < len; i++) {
         var rule = rules[i]
         if (p = rule.tryParse(pos, input)) {
           res[keys[i]] = p[1]
           pos = p[0]
-          continue
+          found = true
+          break
         }
       }
-      break
+      if (!found) break
     }
     // return what we got.
     return [pos, res]
