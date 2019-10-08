@@ -663,6 +663,7 @@ export const CONTAINER_MEMBERS: Rule<a.Declaration[]> = ZeroOrMore(Either(
   USINGNAMESPACE,
   OLD_FUNCTION_DECLARATION,
   CONTAINER_FIELD,
+  TEST_DECLARATION,
   S`${Not('}')} ${any}`.map(e => e[1]), // will advance if we can't recognize an expression, so that the parser doesn't choke on invalid declarations.
 )).map(res => res.filter(r => !(r instanceof Lexeme)))
 
