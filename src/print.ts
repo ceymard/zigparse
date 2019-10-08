@@ -12,8 +12,16 @@ export function print_node(n: Node, indent = '', prefix = '') {
     suppl.push(ch.yellow(n.value))
   else if (n instanceof a.Operator)
     suppl.push(ch.red(n.value))
-  else if (n instanceof a.VariableDeclaration)
-    suppl.push(ch.bold.bgMagentaBright(n.name.value))
+  else if (n instanceof a.VariableDeclaration) {
+    var c = ch.bold
+    if (n.value instanceof a.ContainerDeclaration)
+      c = c.bgRedBright
+    else if (n.value instanceof a.FunctionDefinition)
+      c = c.bgGreenBright.black
+    else
+      c = c.bgCyanBright.black
+    suppl.push(c(n.name.value))
+  }
 
   console.log(indent + prefix + n.constructor.name + (suppl.length ? '(' + suppl.join(', ') + ')' : ''))
   for (var c of n.children) {
