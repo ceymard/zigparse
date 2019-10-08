@@ -3,6 +3,7 @@ import { Node } from "./libparse"
 
 
 export type Opt<T> = T | null | undefined
+export type Names = {[name: string]: Declaration}
 
 
 // FIXME missing Node.getDeclarations
@@ -10,6 +11,10 @@ export type Opt<T> = T | null | undefined
 export class ZigNode extends Node {
 
   parent!: ZigNode
+
+  getMembers(): Names {
+    return {}
+  }
 
   getCompletionsAt(offset: number): Declaration[] {
     return this.getNodeAt(offset).getCompletions()
@@ -23,7 +28,7 @@ export class ZigNode extends Node {
     return []
   }
 
-  getAvailableNames(): {[name: string]: Declaration} {
+  getAvailableNames(): Names {
     var own = this.getOwnNames()
     if (this.parent) {
       own = Object.assign(this.parent.getAvailableNames(), own)
@@ -39,7 +44,11 @@ export class ZigNode extends Node {
     return null
   }
 
-  getOwnNames(): {[name: string]: Declaration} {
+  getDefinition(): Definition | null {
+    return null
+  }
+
+  getOwnNames(): Names {
     return {}
   }
 
@@ -70,6 +79,27 @@ export class Declaration extends Expression {
   name!: Identifier
   type: Opt<Expression>
   value: Opt<Expression> // when used with extern, there may not be a value
+
+  getMembers() {
+    // there, we get the type
+    if (this.type) {
+      const decl = this.type.getDeclaration()
+
+      // we want to go to the root of the declaration
+      while (decl instanceof Declaration) {
+
+      }
+      // here, this is not decl.getMembers(), since decl is adressed in type space
+      console.log(decl)
+    }
+
+    if (this.value) {
+      // return the value as is
+    }
+
+    return {}
+  }
+
 }
 
 
@@ -87,8 +117,8 @@ export class Block extends Expression {
   // used when the block is asked what type it is...
   breaks: Expression[] = []
 
-  getOwnNames(): {[name: string]: Declaration} {
-    var res = {} as {[name: string]: Declaration}
+  getOwnNames(): Names {
+    var res = {} as Names
     for (var s of this.statements) {
       if (s instanceof Declaration)
         res[s.name.value] = s
@@ -137,6 +167,11 @@ export class Identifier extends Literal {
     return this.getAvailableNames()[this.value] || null
   }
 
+  getMembers(): Names {
+    const decl = this.getDeclaration()
+    return decl ? decl.getMembers() : {}
+  }
+
 }
 
 
@@ -167,10 +202,8 @@ export class BuiltinFunctionCall extends Expression {
 
 ////////////////////////////////////////////////////////
 
-export class FunctionArgumentDefinition extends Expression {
+export class FunctionArgumentDefinition extends Declaration {
   comptime = false
-  name: Opt<Identifier>
-  type!: Expression
 }
 
 
@@ -183,7 +216,9 @@ export class FunctionPrototype extends Expression {
 
 
 export class Definition extends Expression {
-
+  getDefinition() {
+    return this
+  }
 }
 
 
@@ -191,18 +226,26 @@ export class FunctionDefinition extends Definition {
   pub = false
   proto!: FunctionPrototype
   block: Opt<Block>
+
+  getOwnNames(): Names {
+    var res = {} as Names
+    for (var a of this.proto.args) {
+      if (!a.name) continue
+      res[a.name.value] = a
+    }
+    return res
+  }
 }
 
 
 export class VariableDeclaration extends Declaration {
-  pub = false
-  extern = false
-  type: Opt<Expression>
-  value: Opt<Expression>
+
 }
 
 
-export class ContainerField extends Declaration { }
+export class ContainerField extends Declaration {
+  pub = true
+}
 
 
 export class ContainerDeclaration extends Definition {
@@ -212,12 +255,39 @@ export class ContainerDeclaration extends Definition {
   members: ZigNode[] = []
 
   getOwnNames() {
-    var res = {} as {[name: string]: Declaration}
+    var res = {} as Names
     for (var s of this.members)
-      if (s instanceof Declaration)
+      if (s instanceof Declaration && !(s instanceof ContainerField))
         res[s.name.value] = s
     return res
   }
+
+  getMembers() {
+    // Members of a container are its very own declarations, not all the ones in scope.
+    return this.getOwnNames()
+  }
+
+  getInstance(): ContainerInstance {
+    return new ContainerInstance(this)
+  }
+}
+
+
+/**
+ * This class is not meant to be instanciated by
+ */
+export class ContainerInstance extends Definition {
+  constructor(public decl: ContainerDeclaration) { super() }
+
+  getMembers(): Names {
+    var res = {} as Names
+    for (var m of this.decl.members) {
+      if (m instanceof ContainerField)
+        res[m.name.value] = m
+    }
+    return res
+  }
+
 }
 
 
@@ -311,8 +381,8 @@ export class NotOpt extends UnaryOpExpression { }
 export class Operator extends Expression {
   value = ''
 
-  getDeclaration() {
-    return this.parent.getDeclaration()
+  getMembers() {
+    return this.parent.getMembers()
   }
 }
 
@@ -333,7 +403,7 @@ export class PayloadedExpression extends Expression {
   // what expression it is related to.
 
   getAvailableNames() {
-    var names = {} as {[name: string]: Declaration}
+    var names = {} as Names
     return names
     // if (this.payload) {
 
@@ -359,12 +429,9 @@ export class DotBinOp extends BinOpExpression {
 
   rhs: Opt<Identifier>
 
-  getDeclaration() {
-    if (this.lhs) {
-      var lhsdecl = this.lhs.getDeclaration()
-      return lhsdecl
-    }
-    return null
+  getMembers() {
+    if (!this.lhs) return {}
+    return this.lhs.getMembers()
   }
 
 }
