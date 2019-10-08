@@ -78,16 +78,12 @@ export const IDENT = S`${Not(/align|and|allowzero|asm|async|await|break|catch|co
 
 ///////////////////////////////
 export const VAR = Token('var')
-.map(r =>
-  new a.VarType().set('name', new a.Identifier().set('value', r.str))
-)
+.map(r => new a.VarType())
 
 
 ////////////////////////////////
 export const DOT3 = Token('...')
-.map(r =>
-  new a.Dot3Type().set('name', new a.Identifier().set('value', r.str))
-)
+.map(r => new a.Dot3Type())
 
 
 ///////////////////////////////
