@@ -390,7 +390,7 @@ export const SUFFIX_OPERATOR = Either(
     slice: Opt(S`.. ${Opt(EXPRESSION)}`),
     _2: ']'
   }).map(e => new a.ArrayAccessOp().set('rhs', e.exp).set('slice', e.slice)), // FIXME this needs slice and it's probably not correct since I don't capture ..
-  SeqObj({op: Operator('.'), id: IDENT}).map(e => new a.DotBinOp().set('rhs', e.id).set('operator', e.op)),
+  SeqObj({op: Operator('.'), id: Opt(IDENT)}).map(e => new a.DotBinOp().set('rhs', e.id).set('operator', e.op)),
   S`. *`.map(e => new a.DerefOp()),
   S`. ?`.map(e => new a.DeOpt()),
 )

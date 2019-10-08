@@ -650,6 +650,14 @@ export class Node {
     return p
   }
 
+  getNodeAt(offset: number): Node {
+    for (var c of this.children) {
+      if (c.range && (c.range[0].offset <= offset && offset <= c.range[1].offset))
+        return c.getNodeAt(offset)
+    }
+    return this
+  }
+
   /**
    * Query the tree upwards to get a node of a certain type.
    * @param t The kind of node we're looking for
