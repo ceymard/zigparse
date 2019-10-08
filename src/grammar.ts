@@ -362,7 +362,7 @@ export const PREFIX_TYPE_OP = Either(
   // declaration of an array type or a slice
   SeqObj({
     _1: '[',
-    exp: EXPRESSION,
+    exp: Opt(EXPRESSION),
     _2: ']',
     modifiers: TYPE_MODIFIER
   }),
@@ -507,7 +507,7 @@ export const FUNCTION_PROTOTYPE = SeqObj({
   bytealign:    Opt(BYTE_ALIGN),
   link:         Opt(LINK_SECTION),
   anyerror:     Opt('!'),
-  return_type:  Either(VAR, SUFFIX_EXPRESSION),
+  return_type:  Either(VAR, TYPE_EXPRESSION),
 })
 .map(res => new a.FunctionPrototype()
   .set('args', res.args)

@@ -106,6 +106,7 @@ export class PrimitiveType extends Expression {
   name!: Identifier
 }
 
+export class TypeType extends PrimitiveType { }
 export class VarType extends PrimitiveType { }
 export class Dot3Type extends PrimitiveType { }
 
