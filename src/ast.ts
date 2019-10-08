@@ -24,6 +24,7 @@ export class Declaration extends ZigNode {
   pub = false
   comptime = false
   extern = false
+  doc: Opt<string>
   name!: Identifier
   type: Opt<Expression>
   value: Opt<Expression> // when used with extern, there may not be a value
@@ -149,6 +150,9 @@ export class VariableDeclaration extends Declaration {
   type: Opt<Expression>
   value: Opt<Expression>
 }
+
+
+export class ContainerField extends Declaration { }
 
 
 export class ContainerDeclaration extends Expression {

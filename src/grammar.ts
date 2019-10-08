@@ -440,10 +440,16 @@ export const CONTAINER_FIELD = SeqObj({
   doc:        DOC,
               opt_kw_pub,
   ident:      IDENT,
-  type:       S` : ${Opt(TYPE_EXPRESSION)}`,
-  value:      S` = ${Opt(EXPRESSION)}`,
+  type:       Opt(S` : ${TYPE_EXPRESSION}`),
+  value:      Opt(S` = ${EXPRESSION}`),
   opt_comma:  Opt(',')
 })
+.map(r => new a.ContainerField()
+  .set('doc', r.doc)
+  .set('name', r.ident)
+  .set('type', r.type)
+  .set('value', r.value)
+)
 
 
 ////////////////////////////////////////////
