@@ -13,9 +13,12 @@ for (var filename of process.argv.slice(2)) {
   const input = l.feed(f)
   const res = ROOT.parse(input) as a.FileBlock
   res._onParsed()
-  // console.log(res.getNodeAt(158))
-  if (false)
-    print_node(res)
+
+  var WHERE = 168
+  console.log(Object.keys(res.getNodeAt(WHERE).getAvailableNames()))
+  console.log(res.getCompletionsAt(WHERE))
+  // if (false)
+    // print_node(res)
   // console.log(res.statements[0])
   // console.log(f)
 }

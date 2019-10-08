@@ -697,5 +697,5 @@ export const CONTAINER_MEMBERS: Rule<a.Declaration[]> = ZeroOrMore(Either(
 
 export const ROOT = CONTAINER_MEMBERS
 .map(statements => new a.FileBlock()
-  .set('statements', statements)
+  .set('members', statements)
 )

@@ -11,23 +11,30 @@ export class ZigNode extends Node {
 
   parent!: ZigNode
 
-  getAvailableNames(): {[name: string]: ZigNode} {
+  getCompletionsAt(offset: number): Declaration[] {
+    return this.getNodeAt(offset).getCompletions()
+  }
+
+  getNodeAt(n: number): ZigNode {
+    return super.getNodeAt(n) as ZigNode
+  }
+
+  getCompletions(): Declaration[] {
+    return []
+  }
+
+  getAvailableNames(): {[name: string]: Declaration} {
+    var own = this.getOwnNames()
     if (this.parent) {
-      return this.parent.getAvailableNames()
+      own = Object.assign(this.parent.getAvailableNames(), own)
     }
+    return own
+  }
+
+  getOwnNames(): {[name: string]: Declaration} {
     return {}
   }
 
-}
-
-export class Declaration extends ZigNode {
-  pub = false
-  comptime = false
-  extern = false
-  doc: Opt<string>
-  name!: Identifier
-  type: Opt<Expression>
-  value: Opt<Expression> // when used with extern, there may not be a value
 }
 
 
@@ -47,6 +54,17 @@ export class Expression extends ZigNode {
 }
 
 
+export class Declaration extends Expression {
+  pub = false
+  comptime = false
+  extern = false
+  doc: Opt<string>
+  name!: Identifier
+  type: Opt<Expression>
+  value: Opt<Expression> // when used with extern, there may not be a value
+}
+
+
 /**
  *
  */
@@ -55,12 +73,20 @@ export class Block extends Expression {
   comptime = false
   label: Opt<string>
 
-  declarations: {[name: string]: Declaration} = {}
   statements: ZigNode[] = []
   import_namespaces: UsingNamespace[] = []
 
   // used when the block is asked what type it is...
   breaks: Expression[] = []
+
+  getOwnNames(): {[name: string]: Declaration} {
+    var res = {} as {[name: string]: Declaration}
+    for (var s of this.statements) {
+      if (s instanceof Declaration)
+        res[s.name.value] = s
+    }
+    return res
+  }
 
 }
 
@@ -96,8 +122,12 @@ export class Literal extends Expression {
 }
 
 export class Identifier extends Literal {
+
   doc: Opt<string>
+
 }
+
+
 export class StringLiteral extends Literal { }
 export class CharLiteral extends Literal { }
 export class BooleanLiteral extends Literal { }
@@ -140,7 +170,7 @@ export class FunctionPrototype extends Expression {
 }
 
 
-export class FunctionDefinition extends Expression {
+export class FunctionDefinition extends Declaration {
   pub = false
   proto!: FunctionPrototype
   block: Opt<Block>
@@ -158,12 +188,19 @@ export class VariableDeclaration extends Declaration {
 export class ContainerField extends Declaration { }
 
 
-export class ContainerDeclaration extends Expression {
+export class ContainerDeclaration extends Declaration {
   extern = false
   packed = false
 
-  statements: Node[] = []
-  members: Declaration[] = []
+  members: ZigNode[] = []
+
+  getOwnNames() {
+    var res = {} as {[name: string]: Declaration}
+    for (var s of this.members)
+      if (s instanceof Declaration)
+        res[s.name.value] = s
+    return res
+  }
 }
 
 
@@ -274,7 +311,7 @@ export class PayloadedExpression extends Expression {
   // what expression it is related to.
 
   getAvailableNames() {
-    var names = {} as {[name: string]: ZigNode}
+    var names = {} as {[name: string]: Declaration}
     return names
     // if (this.payload) {
 
