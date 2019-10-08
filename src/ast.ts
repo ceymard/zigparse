@@ -340,7 +340,7 @@ export class Pointer extends Expression {
   getMembers(as_instance: boolean): Names {
     if (!this.rhs) return {}
     return {
-      ...this.rhs.getMembers(as_instance),
+      ...(this.kind === '*' ? this.rhs.getMembers(as_instance) : {}),
       '*': VariableDeclaration.fake('*', this.rhs, this)
     }
   }
