@@ -512,6 +512,7 @@ export const FUNCTION_PROTOTYPE = SeqObj({
 
 
 export const OLD_FUNCTION_DECLARATION = SeqObj({
+  doc:        DOC,
   pub:        Opt('pub'),
   proto:      FUNCTION_PROTOTYPE,
   blk:        Either(() => BLOCK, Opt(';').map(r => null))
@@ -664,7 +665,7 @@ export const CONTAINER_MEMBERS: Rule<a.Declaration[]> = ZeroOrMore(Either(
   OLD_FUNCTION_DECLARATION,
   CONTAINER_FIELD,
   TEST_DECLARATION,
-  S`${Not('}')} ${any}`.map(e => e[1]), // will advance if we can't recognize an expression, so that the parser doesn't choke on invalid declarations.
+  S`${Not('}')} ${any}`.map(e => e[1]).debug, // will advance if we can't recognize an expression, so that the parser doesn't choke on invalid declarations.
 )).map(res => res.filter(r => !(r instanceof Lexeme)))
 
 

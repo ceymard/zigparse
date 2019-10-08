@@ -67,25 +67,22 @@ export class Lexer {
   feed(str: string): Lexeme[] {
     var idx = 0
     var position = 0
-    var line = 0
-    var col = 0
+    var line = 1
+    var col = 1
     var regexps = this.regexps
     var original_regexps = this.original_regexps
     var res: Lexeme[] = []
     var skip = this.skip
 
     const lines = (s: string): [number, number] => {
-      var lines = 0
       var len = s.length
-      var col = 0
       for (var i = 0; i < len; i++) {
         col++
         if (s[i] === '\n') {
-          lines++
-          col = 0
+          line++
+          col = 1
         }
       }
-      return [lines, col]
     }
 
     const next = () => {
@@ -119,8 +116,6 @@ export class Lexer {
       }
       idx += m[0].length
       var lin = lines(m[0])
-      line += lin[0]
-      col = lin[1]
     }
 
     if (idx < str.length) {
