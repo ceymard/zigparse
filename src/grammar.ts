@@ -321,7 +321,7 @@ export const PRIMARY_TYPE_EXPRESSION: Rule<a.Expression> = Either(
   Token(T.CHAR).map(n => new a.CharLiteral().set('value', n.str)),
   Token(T.STR).map(n => new a.StringLiteral().set('value', n.str)),
   // parenthesized expression
-  S`( ${() => PRIMARY_TYPE_EXPRESSION} )`,
+  S`( ${() => EXPRESSION} )`,
   S`error { ${SeparatedBy(',', IDENT)} }`.map(idents => new a.ErrorSet().set('idents', idents)),
   // function call
   SeqObj({
@@ -501,7 +501,7 @@ export const FUNCTION_PROTOTYPE = SeqObj({
   bytealign:    Opt(BYTE_ALIGN),
   link:         Opt(LINK_SECTION),
   anyerror:     Opt('!'),
-  return_type:  Either(VAR, PRIMARY_TYPE_EXPRESSION),
+  return_type:  Either(VAR, SUFFIX_EXPRESSION),
 })
 .map(res => new a.FunctionPrototype()
   .set('args', res.args)
