@@ -630,7 +630,7 @@ export class Node {
       return a1 > b1 ? 1 : a1 < b1 ? -1 : 0
     })
 
-    if (this.children.length && (!this.range || this.range[0].offset > this.children[0].range[0].offset)) {
+    if (this.children.length && !this.range) {
       this.range = [
         this.children[0].range[0],
         this.children[this.children.length - 1].range[1]
@@ -652,8 +652,10 @@ export class Node {
 
   getNodeAt(offset: number): Node {
     for (var c of this.children) {
-      if (c.range && (c.range[0].offset <= offset && offset <= c.range[1].offset))
+      // console.log(c.constructor.name, c.range)
+      if (c.range && (c.range[0].offset <= offset && offset <= c.range[1].offset)) {
         return c.getNodeAt(offset)
+      }
     }
     return this
   }

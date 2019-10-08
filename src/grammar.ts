@@ -348,7 +348,7 @@ export const BYTE_ALIGN = S`align ( ${EXPRESSION} )`
 
 function reduce_unary<T extends a.Expression & {rhs: a.Expression}>(lst: T[], last: a.Expression) {
   var res = last
-  for (var i = lst.length - 1; i > 0; i--) {
+  for (var i = lst.length - 1; i >= 0; i--) {
     res = lst[i].set('rhs', res)
   }
   return res
@@ -391,8 +391,8 @@ export const SUFFIX_OPERATOR = Either(
     _2: ']'
   }).map(e => new a.ArrayAccessOp().set('rhs', e.exp).set('slice', e.slice)), // FIXME this needs slice and it's probably not correct since I don't capture ..
   SeqObj({op: Operator('.'), id: Opt(IDENT)}).map(e => new a.DotBinOp().set('rhs', e.id).set('operator', e.op)),
-  S`. *`.map(e => new a.DerefOp()),
-  S`. ?`.map(e => new a.DeOpt()),
+  S`.*`.map(e => new a.DerefOp()),
+  S`.?`.map(e => new a.DeOpt()),
 )
 
 
@@ -419,7 +419,7 @@ export const SUFFIX_EXPRESSION = Either(
     if (e.modifiers.length > 0) {
       var xp = e.exp as a.Expression
       for (var m of e.modifiers) {
-        (m as a.BinOpExpression).set('lhs', xp)
+        (m as a.UnaryOpExpression).set('lhs', xp)
         xp = m
       }
       return xp
@@ -441,7 +441,7 @@ export const TYPE_EXPRESSION: Rule<a.Expression> = SeqObj({
   prefix: ZeroOrMore(PREFIX_TYPE_OP),
   error_union_expr: ERROR_UNION_EXPRESSION
 })
-.map(r => r.prefix ? reduce_unary(r.prefix, r.error_union_expr) : r.error_union_expr)
+.map(r => r.prefix.length ? reduce_unary(r.prefix, r.error_union_expr) : r.error_union_expr)
 
 
 ////////////////////////////////////////
@@ -499,7 +499,7 @@ export const FUNCTION_ARGUMENT = SeqObj({
 })
 .map(r =>
   new a.FunctionArgumentDefinition()
-    .set('name', r.ident)
+    .set('name', r.ident!)
     .set('type', r.type)
 )
 

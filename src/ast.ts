@@ -12,11 +12,7 @@ export class ZigNode extends Node {
 
   parent!: ZigNode
 
-  getMembers(): Names {
-    return {}
-  }
-
-  getInstanceMembers(): Names {
+  getMembers(as_instance: boolean): Names {
     return {}
   }
 
@@ -84,27 +80,16 @@ export class Declaration extends Expression {
   type: Opt<Expression>
   value: Opt<Expression> // when used with extern, there may not be a value
 
-  getInstanceMembers() {
-    // Look at value exclusively
-    if (!this.value) return {}
-    return this.value.getInstanceMembers()
-  }
-
-  getMembers() {
+  getMembers(as_instance: boolean) {
     // FIXME check that the final type definition does come from the same file
     // in the contrary case, filter out the non-public declarations.
-
     // there, we get the type
     if (this.type && !(this.type instanceof Identifier && this.type.value === 'type')) {
-      const decl = this.type.getDeclaration()
-      // what about pointers and stuff ?
-      // what about optionals ?
-      if (!decl) return {}
-      return decl.getInstanceMembers()
+      return this.type.getMembers(true)
     }
 
     if (this.value) {
-      return this.value.getMembers()
+      return this.value.getMembers(as_instance)
     }
 
     return {}
@@ -177,9 +162,10 @@ export class Identifier extends Literal {
     return this.getAvailableNames()[this.value] || null
   }
 
-  getMembers(): Names {
+  getMembers(as_instance: boolean): Names {
     const decl = this.getDeclaration()
-    return decl ? decl.getMembers() : {}
+    var res = decl ? decl.getMembers(as_instance) : {}
+    return res
   }
 
 }
@@ -248,7 +234,13 @@ export class FunctionDefinition extends Definition {
 
 
 export class VariableDeclaration extends Declaration {
-
+  static fake(name: string, type: Expression, from_node: Expression) {
+    var res = new VariableDeclaration()
+      .set('name', new Identifier().set('value', name))
+      .set('type', type)
+    res.parent = from_node
+    return res
+  }
 }
 
 
@@ -271,8 +263,10 @@ export class ContainerDeclaration extends Definition {
     return res
   }
 
-  getMembers() {
+  getMembers(as_instance: boolean) {
     // Members of a container are its very own declarations, not all the ones in scope.
+    if (as_instance)
+      return this.getInstanceMembers()
     return this.getOwnNames()
   }
 
@@ -332,12 +326,24 @@ export class PromiseType extends Expression {
 
 export class Optional extends Expression {
   rhs!: Expression
+
+  getMembers(as_instance: boolean): Names {
+    return {'?': VariableDeclaration.fake('?', this.rhs, this)}
+  }
 }
 
 export class Pointer extends Expression {
   rhs!: Expression
   kind!: string
   modifiers!: TypeModifiers
+
+  getMembers(as_instance: boolean): Names {
+    if (!this.rhs) return {}
+    return {
+      ...this.rhs.getMembers(as_instance),
+      '*': VariableDeclaration.fake('*', this.rhs, this)
+    }
+  }
 }
 
 export class Reference extends Expression {
@@ -365,21 +371,36 @@ export class FileBlock extends StructDeclaration {
 
 export class UnaryOpExpression extends Expression {
   op: Opt<Operator>
-  rhs: Opt<Expression>
+  lhs: Opt<Expression>
 }
 
 // .*
-export class DerefOp extends UnaryOpExpression { }
+export class DerefOp extends UnaryOpExpression {
+  getMembers(as_instance: boolean) {
+    if (!this.lhs) return {}
+    const m = this.lhs.getMembers(as_instance)['*']
+    return m.getMembers(as_instance)
+  }
+}
 // .?
-export class DeOpt extends UnaryOpExpression { }
+export class DeOpt extends UnaryOpExpression {
+  getMembers(as_instance: boolean) {
+    if (!this.lhs) return {}
+    const m = this.lhs.getMembers(as_instance)['?']
+    return m.getMembers(as_instance)
+  }
+}
 // !
 export class NotOpt extends UnaryOpExpression { }
 
 export class Operator extends Expression {
   value = ''
 
-  getMembers() {
-    return this.parent.getMembers()
+  getMembers(as_instance: boolean) {
+    if (this.value === '.' && this.parent instanceof DotBinOp && this.parent.lhs) {
+      return this.parent.lhs.getMembers(as_instance)
+    }
+    return {}
   }
 }
 
@@ -426,9 +447,9 @@ export class DotBinOp extends BinOpExpression {
 
   rhs: Opt<Identifier>
 
-  getMembers() {
+  getMembers(as_instance: boolean) {
     if (!this.lhs) return {}
-    return this.lhs.getMembers()
+    return this.lhs.getMembers(as_instance)
   }
 
 }
