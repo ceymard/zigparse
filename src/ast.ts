@@ -31,6 +31,14 @@ export class ZigNode extends Node {
     return own
   }
 
+  /**
+   * get the definition of a node, which means its type definition, when
+   * available.
+   */
+  getDeclaration(): Declaration | null {
+    return null
+  }
+
   getOwnNames(): {[name: string]: Declaration} {
     return {}
   }
@@ -125,6 +133,10 @@ export class Identifier extends Literal {
 
   doc: Opt<string>
 
+  getDeclaration() {
+    return this.getAvailableNames()[this.value] || null
+  }
+
 }
 
 
@@ -170,7 +182,12 @@ export class FunctionPrototype extends Expression {
 }
 
 
-export class FunctionDefinition extends Declaration {
+export class Definition extends Expression {
+
+}
+
+
+export class FunctionDefinition extends Definition {
   pub = false
   proto!: FunctionPrototype
   block: Opt<Block>
@@ -188,7 +205,7 @@ export class VariableDeclaration extends Declaration {
 export class ContainerField extends Declaration { }
 
 
-export class ContainerDeclaration extends Declaration {
+export class ContainerDeclaration extends Definition {
   extern = false
   packed = false
 
@@ -293,12 +310,17 @@ export class NotOpt extends UnaryOpExpression { }
 
 export class Operator extends Expression {
   value = ''
+
+  getDeclaration() {
+    return this.parent.getDeclaration()
+  }
 }
 
 export class BinOpExpression extends Expression {
   operator!: Operator
   rhs: Opt<Expression>
   lhs: Opt<Expression>
+
 }
 
 export class PayloadedExpression extends Expression {
@@ -333,7 +355,19 @@ export class CatchOperator extends Operator {
 }
 
 // exp . ident
-export class DotBinOp extends BinOpExpression { }
+export class DotBinOp extends BinOpExpression {
+
+  rhs: Opt<Identifier>
+
+  getDeclaration() {
+    if (this.lhs) {
+      var lhsdecl = this.lhs.getDeclaration()
+      return lhsdecl
+    }
+    return null
+  }
+
+}
 
 // exp [ .. ]
 export class ArrayAccessOp extends BinOpExpression {

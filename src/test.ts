@@ -15,10 +15,11 @@ for (var filename of process.argv.slice(2)) {
   res._onParsed()
 
   var WHERE = 168
+  console.log(res.getNodeAt(WHERE).constructor.name)
   console.log(Object.keys(res.getNodeAt(WHERE).getAvailableNames()))
-  console.log(res.getCompletionsAt(WHERE))
-  // if (false)
-    // print_node(res)
+  console.log(res.getNodeAt(WHERE).getDeclaration())
+  if (false)
+    print_node(res)
   // console.log(res.statements[0])
   // console.log(f)
 }

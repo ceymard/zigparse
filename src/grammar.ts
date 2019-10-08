@@ -462,7 +462,7 @@ export const CONTAINER_FIELD = SeqObj({
 
 
 ////////////////////////////////////////////
-export const VARIABLE_DECLARATION = SeqObj({
+export const VARIABLE_DECLARATION: Rule<a.VariableDeclaration> = SeqObj({
   doc:        DOC,
               opt_kw_export,
   pub:        OptBool('pub'),
@@ -624,7 +624,7 @@ export const STATEMENT: Rule<a.ZigNode> = S`${Either(
   LOOP_EXPRESSION,
   SWITCH_EXPRESSION,
   ASSIGN_EXPRESSION,
-)} ${Opt(';')}`.map(r => r[0])
+)} ${Opt(';')}`.map(([s, _]) => s as a.ZigNode)
 
 
 ////////////////////////////////////////
@@ -692,7 +692,7 @@ export const CONTAINER_MEMBERS: Rule<a.Declaration[]> = ZeroOrMore(Either(
   S`${Not('}')} ${any}`.map(e => e[1])
     .map(e => null)
   , // will advance if we can't recognize an expression, so that the parser doesn't choke on invalid declarations.
-)).map(res => res.filter(r => !!r))
+)).map(res => res.filter(r => !!r) as a.Declaration[])
 
 
 export const ROOT = CONTAINER_MEMBERS
