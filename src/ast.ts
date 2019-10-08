@@ -16,6 +16,10 @@ export class ZigNode extends Node {
     return {}
   }
 
+  getInstanceMembers(): Names {
+    return {}
+  }
+
   getCompletionsAt(offset: number): Declaration[] {
     return this.getNodeAt(offset).getCompletions()
   }
@@ -80,21 +84,27 @@ export class Declaration extends Expression {
   type: Opt<Expression>
   value: Opt<Expression> // when used with extern, there may not be a value
 
+  getInstanceMembers() {
+    // Look at value exclusively
+    if (!this.value) return {}
+    return this.value.getInstanceMembers()
+  }
+
   getMembers() {
+    // FIXME check that the final type definition does come from the same file
+    // in the contrary case, filter out the non-public declarations.
+
     // there, we get the type
-    if (this.type) {
+    if (this.type && !(this.type instanceof Identifier && this.type.value === 'type')) {
       const decl = this.type.getDeclaration()
-
-      // we want to go to the root of the declaration
-      while (decl instanceof Declaration) {
-
-      }
-      // here, this is not decl.getMembers(), since decl is adressed in type space
-      console.log(decl)
+      // what about pointers and stuff ?
+      // what about optionals ?
+      if (!decl) return {}
+      return decl.getInstanceMembers()
     }
 
     if (this.value) {
-      // return the value as is
+      return this.value.getMembers()
     }
 
     return {}
@@ -173,7 +183,6 @@ export class Identifier extends Literal {
   }
 
 }
-
 
 export class StringLiteral extends Literal { }
 export class CharLiteral extends Literal { }
@@ -267,21 +276,9 @@ export class ContainerDeclaration extends Definition {
     return this.getOwnNames()
   }
 
-  getInstance(): ContainerInstance {
-    return new ContainerInstance(this)
-  }
-}
-
-
-/**
- * This class is not meant to be instanciated by
- */
-export class ContainerInstance extends Definition {
-  constructor(public decl: ContainerDeclaration) { super() }
-
-  getMembers(): Names {
+  getInstanceMembers(): Names {
     var res = {} as Names
-    for (var m of this.decl.members) {
+    for (var m of this.members) {
       if (m instanceof ContainerField)
         res[m.name.value] = m
     }
